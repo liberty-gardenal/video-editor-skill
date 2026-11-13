@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+# Launcher for vedit: finds the repo root (following symlinks) and a Python >= 3.10.
+# Interpreter order: $CLAUDE_PLUGIN_DATA/venv, <repo>/.venv, then the system Python.
+set -e
+
+src="${BASH_SOURCE[0]}"
+while [ -L "$src" ]; do
+  dir="$(cd -P "$(dirname "$src")" && pwd)"
+  src="$(readlink "$src")"
+  case "$src" in /*) ;; *) src="$dir/$src" ;; esac
+done
+root="$(cd -P "$(dirname "$src")/.." && pwd)"
+
+py=""
+if [ -n "${CLAUDE_PLUGIN_DATA:-}" ] && [ -x "$CLAUDE_PLUGIN_DATA/venv/bin/python" ]; then
+  py="$CLAUDE_PLUGIN_DATA/venv/bin/python"
+elif [ -x "$root/.venv/bin/python" ]; then
+  py="$root/.venv/bin/python"
+else
+  for cand in python3.13 python3.12 python3.11 python3.10 python3 python; do
+    p="$(command -v "$cand" 2>/dev/null || true)"
+    [ -n "$p" ] || continue
+    if "$p" -c 'import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)' 2>/dev/null; then
+      py="$p"
+      break
+    fi
+  done
+fi
+
+if [ -z "$py" ]; then
+  echo "Erro: não encontrei Python 3.10 ou superior. Instale (ex.: apt install python3, brew install python) e tente de novo." >&2
+  exit 1
+fi
+
+export PYTHONPATH="$root/lib${PYTHONPATH:+:$PYTHONPATH}"
+exec "$py" -m vedit "$@"

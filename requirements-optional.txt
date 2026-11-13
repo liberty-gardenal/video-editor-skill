@@ -1,0 +1,5 @@
+# Optional packages. `vedit setup` installs Pillow and numpy; `vedit setup --all` adds the rest.
+Pillow>=9.0              # setup: vedit burn without libass
+numpy>=1.23              # setup: transcribe, burn fallback, reframe
+faster-whisper>=1.0      # setup --all: vedit transcribe
+opencv-python>=4.8       # setup --all: vedit reframe (experimental)

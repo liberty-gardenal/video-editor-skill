@@ -1,0 +1,18 @@
+{
+  "name": "video-editor-skill",
+  "description": "Skill pack de edição de vídeo para o Claude Code.",
+  "owner": {
+    "name": "video-editor-skill contributors"
+  },
+  "plugins": [
+    {
+      "name": "video-editor",
+      "source": "./",
+      "description": "Editor de vídeo: cortes de podcast, Reels, motion de narração, montagem na batida e anúncios. Requer o plugin HyperFrames para motion.",
+      "version": "0.1.0",
+      "homepage": "https://github.com/liberty-gardenal/video-editor-skill",
+      "license": "MIT",
+      "keywords": ["video", "editing", "reels", "ffmpeg", "hyperframes"]
+    }
+  ]
+}

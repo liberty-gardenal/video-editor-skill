@@ -1,0 +1,19 @@
+[project]
+name = "vedit"
+version = "0.1.0"
+description = "CLI tools behind the editor-de-video Claude Code skill"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+
+[tool.ruff]
+line-length = 110
+target-version = "py310"
+src = ["lib", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+ignore = ["E501", "B008"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["lib"]

@@ -1,0 +1,3 @@
+# Core runs on the Python standard library + ffmpeg/ffprobe only.
+# `vedit setup` installs Pillow and numpy into the venv; `vedit setup --all` also adds
+# faster-whisper and opencv-python. All of them are listed in requirements-optional.txt.

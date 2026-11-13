@@ -1,0 +1,12 @@
+{
+  "name": "video-editor",
+  "description": "Skill pack que transforma o Claude Code em agente de edição de vídeo: cortes de vídeo longo, talking head, motion de narração, montagem na batida e anúncios, com a CLI vedit para medir e renderizar e o HyperFrames para motion.",
+  "version": "0.1.0",
+  "author": {
+    "name": "video-editor-skill contributors"
+  },
+  "homepage": "https://github.com/liberty-gardenal/video-editor-skill",
+  "repository": "https://github.com/liberty-gardenal/video-editor-skill",
+  "license": "MIT",
+  "keywords": ["video", "editing", "reels", "shorts", "tiktok", "captions", "ffmpeg", "hyperframes", "whisper", "pt-br"]
+}
