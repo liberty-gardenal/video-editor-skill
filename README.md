@@ -9,13 +9,19 @@ o objetivo é entregar vídeo correto, medido e revisável.
 
 ## O que ele faz
 
-Cinco fluxos, cada um com um playbook passo a passo em `skills/editor-de-video/playbooks/`:
+Cinco fluxos de produção, cada um com um playbook passo a passo em `skills/editor-de-video/playbooks/`, mais um playbook de estudo de referência:
 
 1. **Cortes de vídeo longo**: podcast, entrevista, live ou aula viram N clipes verticais, com revisão cega e deduplicação.
 2. **Talking head para Reel**: uma gravação curta vira um Reel enxuto (retakes e silêncio, punch-ins por clipe ou rampa de zoom, legenda, capa, trilha).
 3. **Motion de narração**: só um áudio vira um vídeo inteiro com cenas em HyperFrames, sincronizadas na palavra.
 4. **Montagem na batida**: vários clipes de celular viram um Reel cortado no ritmo, com um momento de fala e final em loop.
 5. **Anúncio com footage real**: fotos e vídeos do cliente + narração viram um criativo para social pago.
+
+Além disso:
+
+- **Estudar referências** (`vedit analyze` + playbook `estudar-referencia.md`): mede cortes, ritmo, loudness e gancho de vídeos que o usuário quer imitar, gera uma ficha de estilo e aplica via EDL e flags. Estuda a técnica; não reusa material de terceiros, e a detecção de cortes é um limite inferior.
+- **Formatos virais observados** (`referencias/formatos-virais.md`): receitas como apresentador com janela de b-roll e corte de podcast com manchete fixa, baseadas em 12 vídeos pt-BR. São práticas observadas, não causas comprovadas de retenção.
+- **B-roll simples e legenda ampliada no `vedit`**: clipe `lower` e `overlays` na EDL (janela de cima, tela cheia, cartão de prova); legenda em modo bloco, palavra ou karaoke, caixa, ênfase por tamanho e manchete fixa.
 
 ## Instalação
 
@@ -118,8 +124,9 @@ Uma EDL gera **um** vídeo (`vedit cut` concatena todos os clipes dela): para N 
 | `doctor`, `setup`, `init` | ambiente e pasta da run |
 | `probe`, `sheet`, `silences` | medir e ver o material |
 | `transcribe`, `digest` | texto com tempo por palavra e versão compacta para ler |
-| `cut`, `edges`, `reframe`, `metrics` | EDL, render, bordas, enquadramento, ritmo |
-| `captions`, `burn` | legenda ASS/SRT e queima |
+| `cut`, `edges`, `reframe`, `metrics` | EDL (inclui `lower` e `overlays`), render, bordas, enquadramento, ritmo |
+| `analyze` | teardown de referência: cortes, tamanho de plano, loudness, ritmo de fala, quadros do gancho |
+| `captions`, `burn` | legenda ASS/SRT (modos, caixa, ênfase, manchete fixa) e queima |
 | `loudness`, `extract-audio`, `mix`, `mux`, `master` | áudio (tirar do render, mixar música, recolocar, normalizar) |
 | `verify` | QC final por plataforma |
 
@@ -129,7 +136,7 @@ Uma EDL gera **um** vídeo (`vedit cut` concatena todos os clipes dela): para N 
 .claude-plugin/        plugin.json e marketplace.json
 skills/editor-de-video/
   SKILL.md             roteador
-  playbooks/           os 5 fluxos
+  playbooks/           os 5 fluxos + estudo de referência
   referencias/         notas de apoio (feed, seleção, cortes, legendas, áudio, motion, QC...)
 agents/                subagentes ve-*
 bin/ lib/              CLI vedit
@@ -142,7 +149,7 @@ tests/  install.sh
 - Não garante desempenho em nenhuma plataforma; só mede o que dá para medir no arquivo.
 - O Claude não ouve áudio: valida por números (LUFS, true peak, bordas) e pede que você ouça.
 - **Estado de cada parte:** `transcribe` foi exercitado manualmente em filmagem real em português (modelo `small`, CPU), mas **não tem teste automatizado**; `reframe` é **experimental e sem teste ponta a ponta**, confira na prancha; HDR sem o filtro `zscale` no ffmpeg é convertido **sem tone mapping** (as cores podem sair lavadas).
-- **O que o `vedit` não faz:** J-cut/L-cut (áudio e imagem cortam no mesmo quadro), pan animado entre keyframes de `crop_x` (o crop salta; só o `zoom` tem rampa linear), B-roll/overlay/gráficos sobre o vídeo e legenda animada (isso é do HyperFrames). Destaque de palavra na legenda é a lista `--highlight` que o editor escolhe, não automático.
+- **O que o `vedit` não faz:** J-cut/L-cut (áudio e imagem cortam no mesmo quadro), pan animado entre keyframes de `crop_x` (o crop salta; só o `zoom` tem rampa linear), texto animado ou digitado, transições (dissolve, glitch, whip), matte/oclusão, cantos arredondados e sombra em cartões, legenda bilíngue, cor por falante, picture-in-picture com etiquetas e explicadores animados (isso é do HyperFrames). Os overlays do `vedit` são só de vídeo, sem sobreposição no tempo, e não mexem no áudio. Destaque de palavra na legenda é a lista `--highlight` que o editor escolhe, não automático.
 - Etapas pesadas (transcrição de vídeo longo, render de motion em alta qualidade) são lentas em CPU.
 - Música e imagens de terceiros são responsabilidade de quem usa; o pack não fornece nem licencia nenhuma.
 

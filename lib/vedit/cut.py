@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from . import edl as edlmod
+from . import overlay
 from .probe import probe
 from .util import (
     VeditError,
@@ -101,7 +102,30 @@ def _region_chain(W, H, OW, rh, cx, zoom, off, n, fps_s):
     return _crop_scale(cw, ch, x, y, OW, rh)
 
 
-def _layout_graph(label_in, label_out, layout, W, H, OW, OH, kfs, n, zoom, uid, fps_s="30"):
+def lower_geometry(OW, OH, split_at, feather):
+    """Return (speaker region top y, speaker region height) for the lower layout.
+
+    The speaker region starts ``feather`` px above ``split_at`` so a ``top`` overlay's feathered
+    edge blends into the speaker instead of into the blurred filler.
+    """
+    from .overlay import feather_px
+
+    sy = even(round(split_at * OH))
+    top = max(sy - feather_px(feather, OH), 0)
+    return top, OH - top
+
+
+def _blur_fill(W, H, OW, OH, cx):
+    """Blurred, darkened full-frame copy of the shot (cheap: blur at 1/6 scale)."""
+    cw, ch, x, y = cover_crop(W, H, OW, OH, cx, 1.0)
+    sw, sh = even(OW / 6), even(OH / 6)
+    return (
+        f"crop={cw}:{ch}:{x}:{y},scale={sw}:{sh},boxblur=4:2,"
+        f"scale={OW}:{OH}:flags=bicubic,eq=brightness=-0.22:saturation=0.85,setsar=1"
+    )
+
+
+def _layout_graph(label_in, label_out, layout, W, H, OW, OH, kfs, n, zoom, uid, fps_s="30", split_at=0.45):
     """Filter graph text for one clip's video after trim; kfs = [(frame, crop_x)], zoom = (z0, z1)."""
     bounds = [f for f, _ in kfs] + [n]
     pieces = []
@@ -128,6 +152,15 @@ def _layout_graph(label_in, label_out, layout, W, H, OW, OH, kfs, n, zoom, uid, 
         if layout == "cover":
             chain = _region_chain(W, H, OW, OH, cx, zoom, bounds[i], n, fps_s)
             parts.append(f"[{src}]{trim}{chain}[{seg_out}]")
+        elif layout == "lower":
+            ly, lh = lower_geometry(OW, OH, split_at, edlmod.FEATHER_DEFAULT)
+            chain = _region_chain(W, H, OW, lh, cx, zoom, bounds[i], n, fps_s)
+            parts.append(
+                f"[{src}]{trim}split[{seg_out}a][{seg_out}b];"
+                f"[{seg_out}a]{_blur_fill(W, H, OW, OH, cx)}[{seg_out}bg];"
+                f"[{seg_out}b]{chain}[{seg_out}fg];"
+                f"[{seg_out}bg][{seg_out}fg]overlay=0:{ly}:shortest=1[{seg_out}]"
+            )
         else:  # split
             top_h, bot_h, _ = split_geometry(W, H, OW, OH, cx, zoom[0])
             chain = _region_chain(W, H, OW, bot_h, cx, zoom, bounds[i], n, fps_s)
@@ -233,7 +266,7 @@ def build_command(edl: dict, edl_path, output: str, preview: bool):
             f"tpad=stop_mode=clone:stop_duration=0.5,trim=end_frame={n},"
             f"setpts=PTS-STARTPTS,{hdr_f}setsar=1[{vin}]"
         )
-        graphs.append(_layout_graph(vin, f"v{i}l", layout, W, H, OW, OH, kfs, n, zoom, f"c{i}", fps_s))
+        graphs.append(_layout_graph(vin, f"v{i}l", layout, W, H, OW, OH, kfs, n, zoom, f"c{i}", fps_s, edlmod.split_at(c)))
         graphs.append(f"[v{i}l]format=yuv420p,setsar=1[v{i}]")
         fade_st = max(d - FADE, 0)
         if info_.get("has_audio") and not still:
@@ -250,7 +283,17 @@ def build_command(edl: dict, edl_path, output: str, preview: bool):
         labels.append(f"[v{i}][a{i}]")
     total_frames = sum(t["frames"] for t in tl)
     total_dur = total_frames / fps
-    graphs.append("".join(labels) + f"concat=n={len(tl)}:v=1:a=1[vout][acat]")
+    ovs = edlmod.check_overlays_timeline(edl, tl, fps)
+    if ovs:
+        ov_inputs, ov_prep, ov_graphs = overlay.build(
+            edl, edl_path, ovs, len(tl), OW, OH, frac, "vcat", "vout", cache
+        )
+        inputs += ov_inputs
+        graphs[:0] = ov_prep  # overlay sources first: see overlay.build
+        graphs.append("".join(labels) + f"concat=n={len(tl)}:v=1:a=1[vcat][acat]")
+        graphs += ov_graphs
+    else:
+        graphs.append("".join(labels) + f"concat=n={len(tl)}:v=1:a=1[vout][acat]")
     # Audio length is forced to the exact video length (concat rounding, per-clip padding).
     graphs.append(f"[acat]apad=whole_dur={total_dur:.6f},atrim=end={total_dur:.6f},asetpts=PTS-STARTPTS[aout]")
     crf, preset = ("28", "veryfast") if preview else ("18", "medium")
@@ -278,6 +321,8 @@ def build_command(edl: dict, edl_path, output: str, preview: bool):
         "hdr_converted": bool(hdr_notes),
         "hdr_note": hdr_notes[0] if hdr_notes else None,
         "preview": preview,
+        "overlays": len(ovs),
+        "warnings": edlmod.edl_warnings(edl, tl, fps),
     }
     return args, summary
 
@@ -293,6 +338,8 @@ def render(edl_path, output, preview: bool = False) -> dict:
         f"({summary['width']}x{summary['height']}"
         f"{', prévia' if preview else ''}). Log: {log}"
     )
+    for w in summary["warnings"]:
+        info(f"AVISO: {w}")
     if summary["hdr_note"]:
         info(f"Fonte HDR detectada: {summary['hdr_note']}")
     run_ffmpeg(args, log_path=log)

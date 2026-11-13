@@ -85,6 +85,22 @@ Por que só candidatos: a frase pode abrir um trecho sem payoff. Confirme que a 
 - Apagar pausas que dão peso emocional ou timing de piada.
 - Comprimir tanto que a causalidade não se forma (o espectador não consegue montar o "porque").
 
+## 7b. Dispositivos de gancho observados (12 referências pt-BR, vertical)
+
+Observado em vídeos publicados, não comprovado como causa de retenção; sem dado de desempenho e sem escuta de áudio.
+
+| Dispositivo | n de 12 | Observação |
+|---|---|---|
+| Manchete na tela no quadro 0 | 7 | responde "o que é isto" antes da primeira palavra; é texto seu, vai na lista de textos inventados |
+| Manchete digitada palavra a palavra sobre imagem escurecida e dessaturada | 1 | HyperFrames |
+| Montagem de b-roll em tela cheia (3+ trocas nos 3 s) | 2 | cada imagem na palavra que ela mostra |
+| Corte seco sem dispositivo (abre na fala) | 2 | exige a 1ª frase forte |
+| Rosto conhecido em clipe na janela de cima | 2 | material de terceiros: direitos e imagem; não copie |
+
+Prática: a skill já pede âncora no quadro 0 e na 1ª frase (seção 3); a manchete é uma forma de ancorar quando a fala sozinha demora. Não prometa o que o vídeo não paga (`legendas.md`, seção 11). Receitas em `formatos-virais.md`.
+
+Duração: as referências vão de 11 a 179 s e cinco ficam entre 100 e 180 s, então peças de até ~3 min circulam. Isso **não** muda o alvo padrão da skill (cortes de 30-60 s, Reel até 45 s); só mostra que peça longa existe quando valor e progressão a sustentam. Limites por plataforma em `plataformas.md`.
+
 ## 8. Legenda, som e atenção
 
 - Evidência acumulada (Gernsbacher, 2015, revisão de mais de 100 estudos) aponta ganhos de compreensão, atenção e memória com legendas, sobretudo em língua não nativa ou ambiente ruidoso; as críticas lembram que boa parte dos estudos usa legenda em outro idioma, adultos ou autorrelato. Trate como apoio, não como prova para qualquer público.

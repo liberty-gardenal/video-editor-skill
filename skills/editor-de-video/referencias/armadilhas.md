@@ -79,6 +79,13 @@
 | 45 | `-webkit-text-stroke` no contorno | glifo "comido" | anel de `text-shadow` em ~16 direções |
 | 46 | Legenda sobre tipografia de motion | duas tipografias brigam | calar sob motion; janelas < 2 s sem legenda |
 | 47 | Faixa de legenda decidida após o layout | cai em cima dos olhos; render refeito | geometria + faixa juntas num quadro real |
+| 91 | Legenda corrida sobre cartão de prova com texto próprio | texto sobre texto, ilegível (visto numa referência viral) | `vedit captions` cala sob cartões; não use `--keep-under-cards` se o cartão tem texto |
+| 92 | Copiar o pico de áudio das referências (6 de 12 acima de -1 dBTP, um em +0,2) | clip no AAC, `verify` reprova | alvo da skill: -14 LUFS, -1,5 dBTP; meça no arquivo final |
+| 93 | Imagem de enchimento ocupando meia tela (janela de b-roll sem coisa nomeada) | metade do quadro sem informação | só insira imagem que mostra o que a palavra nomeia; sem imagem, `cover` em tela cheia |
+| 94 | Erro de transcrição queimado na legenda | texto errado na tela (nome, número, termo técnico) | conferir cada bloco queimado contra o áudio e o `words.json`; corrigir só grafia (`legendas.md`, seção 4) |
+| 95 | Overlay `top` sobre clipe que não é `lower` | b-roll cobre o rosto | `top` só sobre `lower`; o `ve-qc` confere |
+| 96 | `lower` sem overlay na região de cima | metade do quadro vazia | `cover` onde não há b-roll |
+| 97 | Overlays sobrepostos no tempo | o `cut` recusa ou mostra a imagem errada | um overlay por vez; deixe intervalo entre eles |
 
 ## G. Crop e tracking
 

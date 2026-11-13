@@ -84,6 +84,16 @@ Skill: `/hyperframes:talking-head-recut` (overlays sobre o vídeo da pessoa) ou
 `/hyperframes:motion-graphics`. Prévia em fps baixo, prancha, só então render alto. Veja
 `motion.md`, seção 15 (handoff). Textos inventados vão numa lista para revisão.
 
+## Fase 6b — janela de b-roll, cartões e manchete (opcional, no `vedit`)
+Para o formato "apresentador com janela de b-roll" (receita e exemplo em
+`referencias/formatos-virais.md`; é prática observada em vídeos publicados, não causa
+comprovada de retenção). Só se houver **coisas nomeadas para mostrar**; sem isso, pule.
+- Clipes onde entra b-roll em cima: `layout: "lower"` (`split_at` 0,45); onde não há, `cover`.
+- Lista `overlays` na EDL: `region: "top"` (janela, só sobre clipe `lower`), `"full"` (tela cheia, p.ex. montagem de gancho), `"card"` (print ou número, 1,5-3 s). `at` em tempo de **saída**, cada um na palavra que mostra; troca a cada 1,5-3 s; sem sobreposição no tempo.
+- Legenda: `--mode`, `--case`, `--emphasis` e a manchete (`--headline "L1|L2" --headline-y 0.12 --headline-start 0`), no máximo 2 linhas, dentro das zonas seguras. A legenda cala sob cartões e fica na costura nos clipes `lower`.
+- Confira rosto x costura x legenda numa prancha com `--guides` antes do render caro e liste manchete e rótulos como textos inventados.
+Animação, transição e cantos arredondados continuam no HyperFrames (Fase 6).
+
 ## Fase 7 — capa
 Quadro 0 com título de até 2 linhas curtas, legível em miniatura, dentro da área segura. Se
 sair pelo HyperFrames, é um PNG sobreposto só no quadro 0. Mostre ao usuário.
@@ -114,3 +124,4 @@ inventados e peça ao usuário para ouvir.
 - [ ] Cada punch-in e troca de layout justificado por uma batida.
 - [ ] Voz medida no arquivo final; música livre de direitos e abaixo da voz.
 - [ ] Capa legível, `verify` aprovado, textos inventados listados.
+- [ ] Se houve janela de b-roll: `top` só sobre `lower`, nenhum overlay sobreposto, nada de legenda sob cartão.

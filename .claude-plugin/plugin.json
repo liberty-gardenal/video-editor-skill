@@ -1,7 +1,7 @@
 {
   "name": "video-editor",
   "description": "Skill pack que transforma o Claude Code em agente de edição de vídeo: cortes de vídeo longo, talking head, motion de narração, montagem na batida e anúncios, com a CLI vedit para medir e renderizar e o HyperFrames para motion.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": {
     "name": "video-editor-skill contributors"
   },

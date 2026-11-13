@@ -26,6 +26,12 @@ ENCODE = [
 ]  # fmt: skip
 
 
+def _ass_rgb(v: str) -> tuple[int, int, int]:
+    """'&H00BBGGRR' style colour -> (r, g, b)."""
+    h = re.sub(r"[^0-9A-Fa-f]", "", v).rjust(8, "0")[-6:]
+    return int(h[4:6], 16), int(h[2:4], 16), int(h[0:2], 16)
+
+
 def parse_ass(path) -> dict:
     """Minimal reader for ASS files written by `vedit captions`."""
     text = Path(path).read_text(encoding="utf-8-sig")
@@ -34,7 +40,9 @@ def parse_ass(path) -> dict:
         m = re.search(rf"^{name}:\s*(\d+)", text, re.M)
         if m:
             res[key] = int(m.group(1))
-    style = {"font": "Arial", "size": 64, "bold": False, "outline": 4, "shadow": 0}
+    default = {"font": "Arial", "size": 64, "bold": False, "outline": 4, "shadow": 0,
+               "border": 1, "primary": (255, 255, 255), "outline_color": (0, 0, 0)}  # fmt: skip
+    styles: dict[str, dict] = {}
     fmt = None
     for line in text.splitlines():
         if line.startswith("Format:") and "Fontname" in line:
@@ -42,14 +50,17 @@ def parse_ass(path) -> dict:
         elif line.startswith("Style:") and fmt:
             vals = [v.strip() for v in line[6:].split(",")]
             row = dict(zip(fmt, vals, strict=False))
-            style.update(
-                font=row.get("Fontname", "Arial"),
-                size=float(row.get("Fontsize", 64)),
-                bold=row.get("Bold", "0") not in ("0", ""),
-                outline=float(row.get("Outline", 4)),
-                shadow=float(row.get("Shadow", 0)),
-            )
-            break
+            styles[row.get("Name", "Default")] = {
+                "font": row.get("Fontname", "Arial"),
+                "size": float(row.get("Fontsize", 64)),
+                "bold": row.get("Bold", "0") not in ("0", ""),
+                "outline": float(row.get("Outline", 4)),
+                "shadow": float(row.get("Shadow", 0)),
+                "border": int(float(row.get("BorderStyle", 1))),
+                "primary": _ass_rgb(row.get("PrimaryColour", "&H00FFFFFF")),
+                "outline_color": _ass_rgb(row.get("OutlineColour", "&H00000000")),
+            }
+    style = styles.get("Default") or next(iter(styles.values()), default)
     events = []
     for line in text.splitlines():
         if not line.startswith("Dialogue:"):
@@ -59,35 +70,45 @@ def parse_ass(path) -> dict:
             continue
         txt = parts[9]
         pos = re.search(r"\\pos\((-?[\d.]+),(-?[\d.]+)\)", txt)
+        fs = re.search(r"\\fs(\d+(?:\.\d+)?)", txt)
         clean = re.sub(r"\{[^}]*\}", "", txt).replace("\\N", " ")
+        cw = _colored_words(txt)
         events.append(
             {
                 "start": _parse_ass_time(parts[1]),
                 "end": _parse_ass_time(parts[2]),
+                "layer": int(parts[0]) if parts[0].strip().lstrip("-").isdigit() else 0,
+                "style": parts[3].strip(),
                 "text": clean,
-                "words": _colored_words(txt),
+                "words": [(w, c) for w, c, _ in cw],
+                "scales": [sc for _, _, sc in cw],
+                "fs": float(fs.group(1)) if fs else None,
                 "pos": (float(pos.group(1)), float(pos.group(2))) if pos else None,
             }
         )
-    return {"res": res, "style": style, "events": events}
+    return {"res": res, "style": style, "styles": styles, "events": events}
 
 
 _COLOR_TAG = re.compile(r"\\1?c&H(?:[0-9A-Fa-f]{2})?([0-9A-Fa-f]{6})&")
+_SCALE_TAG = re.compile(r"\\fscx(\d+(?:\.\d+)?)")
 
 
-def _colored_words(txt: str) -> list[tuple[str, tuple[int, int, int] | None]]:
-    """Split an ASS text into (word, rgb|None) following inline \\c override tags (ASS is BGR)."""
-    words: list[tuple[str, tuple[int, int, int] | None]] = []
+def _colored_words(txt: str) -> list[tuple[str, tuple[int, int, int] | None, float]]:
+    """Split an ASS text into (word, rgb|None, scale) following inline \\c and \\fscx tags (ASS is BGR)."""
+    words: list[tuple[str, tuple[int, int, int] | None, float]] = []
     color = None
+    scale = 1.0
     for tag, text in re.findall(r"(\{[^}]*\})|([^{]+)", txt):
         if tag:
             for m in _COLOR_TAG.finditer(tag):
                 bgr = m.group(1)
                 rgb = (int(bgr[4:6], 16), int(bgr[2:4], 16), int(bgr[0:2], 16))
                 color = None if rgb == (255, 255, 255) else rgb
+            for m in _SCALE_TAG.finditer(tag):
+                scale = float(m.group(1)) / 100
             continue
         for w in text.replace("\\N", " ").split():
-            words.append((w, color))
+            words.append((w, color, scale))
     return words
 
 
@@ -140,16 +161,19 @@ def _load_font(ImageFont, name: str, size: int, bold: bool):
         return ImageFont.load_default()
 
 
-def _wrap(draw, words, font, max_w: int) -> list[list]:
-    """Greedy word wrap; ``words`` is a list of (text, color)."""
+def _wrap(draw, words, font_for, max_w: int) -> list[list]:
+    """Greedy word wrap; ``words`` is a list of (text, color, scale)."""
     lines: list[list] = []
     cur: list = []
+    cur_w = 0.0
+    space = draw.textlength(" ", font=font_for(1.0))
     for w in words:
-        trial = " ".join(x[0] for x in [*cur, w])
-        if cur and draw.textlength(trial, font=font) > max_w:
+        wd = draw.textlength(w[0], font=font_for(w[2]))
+        if cur and cur_w + space + wd > max_w:
             lines.append(cur)
-            cur = [w]
+            cur, cur_w = [w], wd
         else:
+            cur_w += (space if cur else 0) + wd
             cur.append(w)
     if cur:
         lines.append(cur)
@@ -157,32 +181,48 @@ def _wrap(draw, words, font, max_w: int) -> list[list]:
 
 
 def render_frame(Image, ImageDraw, ImageFont, size_wh, ev, style, res, font_name):
-    """Render one caption block onto a transparent RGBA image of the video size.
+    """Render one ASS event onto a transparent RGBA image of the video size.
 
-    Words coloured by inline ASS tags (``vedit captions --highlight``) are drawn in that colour.
+    Words coloured by inline ASS tags (highlight / karaoke) are drawn in that colour, words with
+    ``\\fscx`` are drawn larger, and ``BorderStyle 3`` styles (headline box) get an opaque box.
     """
     vw, vh = size_wh
     k = vh / res["h"]
-    fsize = max(8, int(round(style["size"] * k)))
+    fsize = max(8, int(round((ev.get("fs") or style["size"]) * k)))
     outline = max(1, int(round(style["outline"] * k)))
-    font = _load_font(ImageFont, font_name, fsize, style["bold"])
+    boxed = style.get("border") == 3
+    base_fill = (*style.get("primary", (255, 255, 255)), 255)
+    cache: dict[float, object] = {}
+
+    def font_for(scale: float):
+        if scale not in cache:
+            cache[scale] = _load_font(ImageFont, font_name, max(8, int(round(fsize * scale))), style["bold"])
+        return cache[scale]
+
     img = Image.new("RGBA", (vw, vh), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
     words = ev.get("words") or [(w, None) for w in ev["text"].split()]
-    lines = _wrap(d, words, font, int(vw * 0.88))
+    scales = ev.get("scales") or [1.0] * len(words)
+    words = [(w, c, sc) for (w, c), sc in zip(words, scales, strict=False)]
+    lines = _wrap(d, words, font_for, int(vw * 0.88))
     px, py = ev["pos"] or (res["w"] / 2, res["h"] * 0.7)
     cx, cy = px * vw / res["w"], py * vh / res["h"]
-    line_h = int(fsize * 1.15)
+    line_h = int(fsize * max((sc for _, _, sc in words), default=1.0) * 1.15)
     y0 = cy - line_h * len(lines) / 2
-    space = d.textlength(" ", font=font)
+    space = d.textlength(" ", font=font_for(1.0))
     for i, line in enumerate(lines):
-        widths = [d.textlength(w, font=font) for w, _ in line]
-        x = cx - (sum(widths) + space * max(len(line) - 1, 0)) / 2
+        widths = [d.textlength(w, font=font_for(sc)) for w, _, sc in line]
+        total = sum(widths) + space * max(len(line) - 1, 0)
+        x = cx - total / 2
         yy = y0 + line_h * i + line_h / 2
-        for (w, col), wd in zip(line, widths, strict=True):
-            fill = (*col, 255) if col else (255, 255, 255, 255)
-            d.text((x, yy), w, font=font, fill=fill, anchor="lm",
-                   stroke_width=outline, stroke_fill=(0, 0, 0, 255))  # fmt: skip
+        if boxed:
+            box = (*style.get("outline_color", (0, 0, 0)), 255)
+            d.rectangle((x - outline, yy - line_h / 2 - outline + 1, x + total + outline,
+                         yy + line_h / 2 + outline - 1), fill=box)  # fmt: skip
+        for (w, col, sc), wd in zip(line, widths, strict=True):
+            fill = (*col, 255) if col else base_fill
+            kw = {} if boxed else {"stroke_width": outline, "stroke_fill": (0, 0, 0, 255)}
+            d.text((x, yy), w, font=font_for(sc), fill=fill, anchor="lm", **kw)
             x += wd + space
     return img
 
@@ -232,16 +272,45 @@ def burn(video, ass, output, font: str | None = None, force_fallback: bool = Fal
         def add(path: Path, duration: float):
             lines.append(f"file '{path.as_posix()}'\nduration {duration:.4f}")
 
+        # Events may overlap (headline over captions): one composited frame per interval.
+        cuts = sorted({0.0, *(e["start"] for e in events), *(e["end"] for e in events)})
+        points: list[float] = []
+        for c in cuts:
+            if not points or c - points[-1] >= 0.015:
+                points.append(c)
         t = 0.0
         last = blank
-        for i, ev in enumerate(events):
-            if ev["start"] > t + 0.0005:
-                add(blank, ev["start"] - t)
-            png = tdp / f"c{i:05d}.png"
-            render_frame(PIL_Image, ImageDraw, ImageFont, (vw, vh), ev, parsed["style"],
-                         parsed["res"], font).save(png)  # fmt: skip
-            add(png, max(ev["end"] - max(ev["start"], t), 0.04))
-            t = max(ev["end"], ev["start"] + 0.04)
+        shared: dict[int, object] = {}  # events spanning several intervals are rendered once
+        spans = {i: sum(1 for a, b in zip(points, points[1:], strict=False) if ev["start"] <= a and b <= ev["end"] + 0.015)
+                 for i, ev in enumerate(events)}  # fmt: skip
+        done: dict[tuple, Path] = {}
+        for a, b in zip(points, points[1:], strict=False):
+            if a >= dur and dur:
+                break
+            active = tuple(
+                i for i, ev in enumerate(events) if ev["start"] <= a + 0.0005 and b <= ev["end"] + 0.015
+            )
+            if not active:
+                add(blank, b - t)
+                t = b
+                continue
+            if active not in done:
+                comp = PIL_Image.new("RGBA", (vw, vh), (0, 0, 0, 0))
+                for i in sorted(active, key=lambda j: events[j]["layer"]):
+                    ev = events[i]
+                    layer = shared.get(i)
+                    if layer is None:
+                        sty = parsed["styles"].get(ev["style"], parsed["style"])
+                        layer = render_frame(PIL_Image, ImageDraw, ImageFont, (vw, vh), ev, sty,
+                                             parsed["res"], font)  # fmt: skip
+                        if spans[i] > 1:
+                            shared[i] = layer
+                    comp.alpha_composite(layer)
+                png = tdp / f"c{len(done):05d}.png"
+                comp.save(png)
+                done[active] = png
+            add(done[active], b - t)
+            t = b
         add(blank, max(dur - t, 0) + 1.0)
         lines.append(f"file '{last.as_posix()}'")
         lst = tdp / "list.txt"

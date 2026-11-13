@@ -9,7 +9,7 @@ import traceback
 from pathlib import Path
 
 from . import __version__
-from .util import VeditError, arg_color, arg_ranges, arg_time, dump_json, info
+from .util import VeditError, arg_color, arg_frac, arg_ranges, arg_time, dump_json, info
 
 
 def _out(args, data, text: str | None = None) -> None:
@@ -58,6 +58,16 @@ def cmd_sheet(args):
         cols=args.cols, width=args.width, guides=args.guides,
     )  # fmt: skip
     _out(args, res, f"Prancha gravada em {res['output']} ({res['frames']} quadros).")
+
+
+def cmd_analyze(args):
+    from .analyze import analyze, format_report
+
+    res = analyze(
+        args.video, args.output, scene=args.scene, hook_seconds=args.hook_seconds,
+        words=args.words, transcribe=args.transcribe, regions=args.region, merge=args.merge,
+    )  # fmt: skip
+    _out(args, res, format_report(res))
 
 
 def cmd_transcribe(args):
@@ -118,7 +128,10 @@ def cmd_captions(args):
     res = make_captions(
         args.words, args.edl, args.output, srt=args.srt, style=args.style,
         max_words=args.max_words, y=args.y, font=args.font,
-        highlight=args.highlight, accent=args.accent,
+        highlight=args.highlight, accent=args.accent, mode=args.mode, case=args.case,
+        emphasis=args.emphasis, keep_under_cards=args.keep_under_cards, headline=args.headline,
+        headline_y=args.headline_y, headline_start=args.headline_start, headline_end=args.headline_end,
+        headline_box=args.headline_box, headline_color=args.headline_color,
     )  # fmt: skip
     _out(args, res, f"{res['blocks']} blocos gravados em {res['ass']}.")
 
@@ -231,6 +244,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--width", type=int, default=480)
     p.add_argument("--guides", help="JSON com retângulos em frações (x,y,w,h)")
     js(p)
+    p = add("analyze", cmd_analyze, "teardown de um vídeo de referência (cortes, ritmo, pranchas)")
+    p.add_argument("video")
+    p.add_argument("-o", "--output", required=True, help="pasta de saída (analise.json/.md, pranchas)")
+    p.add_argument("--scene", type=float, default=0.3, help="limiar de detecção de cena (0-1; padrão 0.3; abaixo disso vira falso corte de zoom/gesto)")
+    p.add_argument("--region", action="append", metavar="Y0:Y1",
+                   help="faixa da altura (frações, ex. 0:0.48) detectada em separado; repetível. "
+                        "Sem --region e com poucos cortes, testa metade de cima e de baixo")  # fmt: skip
+    p.add_argument("--merge", type=float, default=0.15,
+                   help="funde detecções mais próximas que N s em um evento (padrão 0.15; 0 desliga)")
+    p.add_argument("--hook-seconds", type=float, default=6.0, help="duração da prancha do gancho (padrão 6)")
+    p.add_argument("--words", help="words.json para medir a fala")
+    p.add_argument("--transcribe", action="store_true", help="transcreve (faster-whisper) se não houver --words")
+    js(p)
     p = add("transcribe", cmd_transcribe, "transcrição por palavra (faster-whisper)")
     p.add_argument("media")
     p.add_argument("-o", "--output", required=True)
@@ -280,6 +306,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--font", default="Arial")
     p.add_argument("--highlight", help='palavras em destaque, ex.: "palavra1,palavra2" (sem caixa/acento)')
     p.add_argument("--accent", type=arg_color, default="#FFD400", help="cor do destaque (padrão #FFD400)")
+    p.add_argument("--mode", choices=["bloco", "palavra", "karaoke"], default="bloco",
+                   help="bloco (padrão), palavra (uma por vez) ou karaoke (palavra ativa na cor --accent)")  # fmt: skip
+    p.add_argument("--case", choices=["upper", "lower", "sentence", "keep"],
+                   help="caixa do texto (padrão: upper no viral, keep no limpo)")  # fmt: skip
+    p.add_argument("--emphasis", help='palavras maiores (~130%%), ex.: "palavra1,palavra2"')
+    p.add_argument("--keep-under-cards", action="store_true",
+                   help="mantém a legenda sob overlays region=card (padrão: silencia)")  # fmt: skip
+    p.add_argument("--headline", help='manchete fixa; "|" quebra linha, ex.: "TEXTO|SEGUNDA LINHA"')
+    p.add_argument("--headline-y", type=arg_frac, default=0.12, help="centro vertical da manchete (0-1; padrão 0.12)")
+    p.add_argument("--headline-start", type=arg_time, default=0.0, help="início da manchete (padrão 0)")
+    p.add_argument("--headline-end", type=arg_time, help="fim da manchete (padrão: vídeo inteiro)")
+    p.add_argument("--headline-box", type=arg_color, help="caixa opaca #RRGGBB atrás de cada linha")
+    p.add_argument("--headline-color", type=arg_color, help="cor do texto da manchete (padrão #FFFFFF)")
     js(p)
     p = add("burn", cmd_burn, "queima a legenda no vídeo (libass ou fallback Pillow)")
     p.add_argument("video")

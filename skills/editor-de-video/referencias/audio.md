@@ -100,7 +100,19 @@ Valide por números: LUFS integrado, true peak, RMS da cauda de música (música
 - Voz sintética em anúncio pago: confira a licença comercial do plano (ver `narracao-tts.md`).
 - Em Reels/TikTok orgânicos, o catálogo de músicas da própria plataforma tem regras de uso comercial próprias; para conteúdo de marca/anúncio use sons autorizados para negócios.
 
+## 12. Observado em referências
+
+Medido em 12 vídeos verticais publicados (observado, sem dados de desempenho: não prova que funciona).
+
+- **Loudness**: 8 de 12 ficam a ~1 dB de -14 LUFS; três ficam entre -16,4 e -17,1. Isso confirma -14 LUFS como alvo, sem torná-lo regra.
+- **True peak**: passa de -1 dBTP em 6 de 12 (um acima de 0). Não copie: mantenha -14 LUFS e **<= -1,5 dBTP** (seção 5); pico acima disso é risco de clipar no AAC, não estilo.
+- **Trilha**: nas peças de talking head/entrevista, **nenhuma trilha audível detectada**. Em três delas o nível nas lacunas entre palavras ficou 14-16 dB abaixo da fala. Limite do método: uma trilha mais de ~10 dB abaixo da voz não é resolvida assim, então isto não quer dizer "sem música".
+- **Silêncios**: removidos de forma agressiva; uma peça não tem nenhuma lacuna entre palavras >= 0,4 s.
+- **SFX nos cortes**: nada detectável acima do acaso. Limite: a maioria dos cortes cai sobre fala.
+
+Conclusão: **só voz, com silêncios curtos e loudness correto, é um padrão válido para talking head**. Música é escolha, não requisito; a seção 9 já diz que o vídeo precisa funcionar sem ela. Quando houver trilha, a seção 7 vale.
+
 ## Fontes
 - EBU R128, https://tech.ebu.ch/publications/r128 (aberta em 2026-11: -23 LUFS, tolerância +/- 0,5 LU; limite de true peak não constava na página).
 - FFmpeg Filters Documentation, https://ffmpeg.org/ffmpeg-filters.html (aberta em 2026-11: defaults do `loudnorm`, `dual_mono`, nota de upsampling a 192 kHz, `silenceremove`, `sidechaincompress`).
-- Receitas de síntese, ducking e latências: medições operacionais próprias.
+- Receitas de síntese, ducking e latências: medições operacionais próprias; seção 12: medição em 12 vídeos de referência.

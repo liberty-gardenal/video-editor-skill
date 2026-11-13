@@ -113,11 +113,22 @@ def join_tokens(words: list[dict]) -> list[dict]:
     return out
 
 
-def group_words(words: list[dict], max_words: int, max_gap: float = 0.6) -> list[list[dict]]:
+def _crosses(barriers, a: dict, b: dict) -> bool:
+    """True when a barrier interval (s, e) lies between word ``a`` and the next word ``b``."""
+    ma, mb = (a["t"] + a["e"]) / 2, (b["t"] + b["e"]) / 2
+    return any(ma < s and mb >= e for s, e in barriers)
+
+
+def group_words(words: list[dict], max_words: int, max_gap: float = 0.6, barriers=()) -> list[list[dict]]:
     blocks: list[list[dict]] = []
     cur: list[dict] = []
     for w in words:
-        if cur and (w["clip"] != cur[-1]["clip"] or len(cur) >= max_words or w["t"] - cur[-1]["e"] > max_gap):
+        if cur and (
+            w["clip"] != cur[-1]["clip"]
+            or len(cur) >= max_words
+            or w["t"] - cur[-1]["e"] > max_gap
+            or (barriers and _crosses(barriers, cur[-1], w))
+        ):
             blocks.append(cur)
             cur = []
         cur.append(w)
@@ -177,10 +188,21 @@ def build_blocks(
     timeline: list[dict],
     max_words: int = 3,
     min_dur: float = 0.25,
+    barriers=(),
 ) -> list[dict]:
-    """Return caption blocks [{start, end, text, clip}] on the final timeline."""
+    """Return caption blocks [{start, end, text, words, times, sstart, clip}] on the final timeline.
+
+    ``barriers`` are timeline intervals (s, e) where captions must stay silent (proof cards):
+    words whose midpoint falls inside are dropped, no block crosses one, and block times are
+    clamped outside it.
+    """
     mapped = join_tokens(remap_words(words, timeline))
-    groups = merge_weightless(push_trailing_weightless(group_words(mapped, max_words), max_words), max_words)
+    mapped = [w for w in mapped if not any(s <= (w["t"] + w["e"]) / 2 < e for s, e in barriers)]
+    for i, w in enumerate(mapped):
+        w["sstart"] = i == 0 or mapped[i - 1]["w"].endswith(SENTENCE_END)
+    groups = merge_weightless(
+        push_trailing_weightless(group_words(mapped, max_words, barriers=barriers), max_words), max_words
+    )
     clip_end = {c["index"]: c["offset"] + c["duration"] for c in timeline}
     blocks = [
         {
@@ -188,6 +210,8 @@ def build_blocks(
             "end": max(g[-1]["e"], g[0]["t"]),
             "text": " ".join(w["w"] for w in g),
             "words": [w["w"] for w in g],
+            "times": [(w["t"], w["e"]) for w in g],
+            "sstart": [w["sstart"] for w in g],
             "clip": g[0]["clip"],
         }
         for g in groups
@@ -201,6 +225,11 @@ def build_blocks(
         if i + 1 < len(blocks) and b["end"] > blocks[i + 1]["start"]:
             b["end"] = blocks[i + 1]["start"]
         b["end"] = max(b["end"], b["start"])
+        for bs, be in barriers:
+            if b["start"] < bs < b["end"]:
+                b["end"] = bs
+            elif bs <= b["start"] < be:
+                b["start"] = min(be, b["end"])
     return [b for b in blocks if b["end"] - b["start"] > 0.001]
 
 
@@ -221,14 +250,114 @@ def _srt_time(t: float) -> str:
     return f"{h:02d}:{m:02d}:{s:02d},{ms:03d}"
 
 
+MODES = ("bloco", "palavra", "karaoke")
+CASES = ("upper", "lower", "sentence", "keep")
+EMPHASIS_SCALE = 130
+HEADLINE_SIZE = 0.064
+SAFE_MARGIN = 0.06
+DEFAULT_SPLIT_AT = 0.45
+
+
+def _ass_style(name, font, size, primary, outline_col, bold, border, outline, shadow, margin_x) -> str:
+    def c(hex_rgb):
+        return "&H00" + ass_color(hex_rgb)[2:-1]
+
+    return (
+        f"Style: {name},{font},{size},{c(primary)},{c(primary)},{c(outline_col)},&H80000000,"
+        f"{-bold},0,0,0,100,100,0,0,{border},{outline},{shadow},5,{margin_x},{margin_x},0,1"
+    )
+
+
+def apply_case(word: str, case: str, sentence_start: bool = False) -> str:
+    if case == "upper":
+        return word.upper()
+    if case == "lower":
+        return word.lower()
+    if case == "sentence":
+        w = word.lower()
+        if sentence_start:
+            for i, ch in enumerate(w):
+                if ch.isalpha():
+                    return w[:i] + ch.upper() + w[i + 1 :]
+        return w
+    return word
+
+
+def _clean(t: str) -> str:
+    return t.replace("{", "(").replace("}", ")").replace("\\", "")
+
+
+def _text_measurer(font: str, size: int, bold: bool):
+    """Return text -> width in px (Pillow when available, else a conservative estimate)."""
+    try:
+        from PIL import ImageFont
+
+        from .burn import find_font_file
+
+        path = find_font_file(font, bold)
+        if path:
+            f = ImageFont.truetype(path, size)
+            return lambda t: f.getlength(t) * 1.04
+    except Exception:  # noqa: BLE001 - any failure falls back to the estimate
+        pass
+    return lambda t: len(t) * size * 0.64
+
+
+def fit_headline(lines: list[str], width: int, height: int, font: str, box: bool) -> tuple[int, list[str]]:
+    """Pick a font size and wrapping so every headline line fits inside the horizontal safe margins."""
+    size0 = int(round(height * HEADLINE_SIZE))
+    pad = int(round(size0 * 0.2)) if box else 0
+    avail = width * (1 - 2 * SAFE_MARGIN) - 2 * pad
+    widest = max(_text_measurer(font, size0, True)(ln) for ln in lines)
+    size = size0 if widest <= avail else max(int(size0 * avail / widest), int(size0 * 0.6))
+    measure = _text_measurer(font, size, True)
+    out: list[str] = []
+    for ln in lines:
+        cur = ""
+        for w in ln.split():
+            trial = f"{cur} {w}".strip()
+            if cur and measure(trial) > avail:
+                out.append(cur)
+                cur = w
+            else:
+                cur = trial
+        out.append(cur)
+    return size, out
+
+
+def _karaoke_spans(b: dict) -> list[tuple[float, float]]:
+    """Per-word (start, end) with no gaps: each word lasts until the next begins; the last until block end."""
+    n = len(b["words"])
+    times = b.get("times") or [(b["start"], b["end"])] * n
+    starts: list[float] = []
+    for t, _e in times:
+        lo = starts[-1] if starts else b["start"]
+        starts.append(min(max(t, lo, b["start"]), b["end"]))
+    starts[0] = b["start"]
+    ends = [*starts[1:], b["end"]]
+    return list(zip(starts, ends, strict=True))
+
+
 def write_ass(
-    blocks, path, style: str, width: int, height: int, y: float, font: str,
-    highlight=None, accent: str = DEFAULT_ACCENT,
+    blocks,
+    path,
+    style: str,
+    width: int,
+    height: int,
+    y: float,
+    font: str,
+    highlight=None,
+    accent: str = DEFAULT_ACCENT,
+    mode: str = "bloco",
+    case: str | None = None,
+    emphasis=None,
+    headline: dict | None = None,
 ) -> None:
     st = STYLES[style]
+    case = case or ("upper" if st["upper"] else "keep")
     size = int(round(height * st["size"]))
     outline = max(1, int(round(height * st["outline"])))
-    margin_x = int(width * 0.06)
+    margin_x = int(width * SAFE_MARGIN)
     lines = [
         "[Script Info]",
         "ScriptType: v4.00+",
@@ -243,27 +372,57 @@ def write_ass(
         "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
         f"Style: Default,{font},{size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,"
         f"{-st['bold']},0,0,0,100,100,0,0,1,{outline},{st['shadow']},5,{margin_x},{margin_x},0,1",
+    ]
+    head_events: list[str] = []
+    if headline:
+        box = headline.get("box")
+        hsize, hlines = fit_headline(headline["lines"], width, height, font, bool(box))
+        pad = int(round(hsize * 0.2))
+        lines.append(
+            _ass_style("Headline", font, hsize, headline.get("color") or "#FFFFFF", box or "#000000", 1,
+                       3 if box else 1, pad if box else max(outline, int(round(hsize * 0.07))), 0, margin_x)
+        )  # fmt: skip
+        line_h = int(round(hsize * 1.15)) + (2 * pad - 2 if box else 0)
+        t0 = headline.get("start", 0.0)
+        t1 = headline["end"]
+        total = line_h * len(hlines)
+        cy = min(max(height * headline.get("y", 0.12), total / 2 + height * 0.03), height * 0.97 - total / 2)
+        for i, ln in enumerate(hlines):
+            ly = int(round(cy - total / 2 + line_h * (i + 0.5)))
+            head_events.append(
+                f"Dialogue: 1,{_ass_time(t0)},{_ass_time(t1)},Headline,,0,0,0,,"
+                f"{{\\an5\\pos({width // 2},{ly})\\fs{hsize}}}{_clean(ln)}"
+            )
+    lines += [
         "",
         "[Events]",
         "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ]
-    px, py = width // 2, int(round(height * y))
     hl = parse_highlight(highlight)
+    em = parse_highlight(emphasis)
     acc, base = ass_color(accent), "&HFFFFFF&"
+    karaoke = mode == "karaoke"
     for b in blocks:
         words = b.get("words") or b["text"].split()
-        parts = []
-        for w in words:
-            t = w.upper() if st["upper"] else w
-            t = t.replace("{", "(").replace("}", ")").replace("\\", "")
-            if hl and norm_word(w) in hl:
-                t = f"{{\\1c{acc}}}{t}{{\\1c{base}}}"
-            parts.append(t)
-        text = " ".join(parts)
-        lines.append(
-            f"Dialogue: 0,{_ass_time(b['start'])},{_ass_time(b['end'])},Default,,0,0,0,,"
-            f"{{\\an5\\pos({px},{py})}}{text}"
-        )
+        sstart = b.get("sstart") or [False] * len(words)
+        px, py = width // 2, int(round(height * b.get("y", y)))
+        spans = _karaoke_spans(b) if karaoke else [(b["start"], b["end"])]
+        for k, (t0, t1) in enumerate(spans):
+            if t1 - t0 <= 0.001 and len(spans) > 1:
+                continue
+            parts = []
+            for i, w in enumerate(words):
+                t = _clean(apply_case(w, case, sstart[i] if i < len(sstart) else False))
+                if em and norm_word(w) in em:
+                    t = f"{{\\fscx{EMPHASIS_SCALE}\\fscy{EMPHASIS_SCALE}}}{t}{{\\fscx100\\fscy100}}"
+                if (karaoke and i == k) or (not karaoke and hl and norm_word(w) in hl):
+                    t = f"{{\\1c{acc}}}{t}{{\\1c{base}}}"
+                parts.append(t)
+            lines.append(
+                f"Dialogue: 0,{_ass_time(t0)},{_ass_time(t1)},Default,,0,0,0,,"
+                f"{{\\an5\\pos({px},{py})}}{' '.join(parts)}"
+            )
+    lines += head_events
     ensure_parent(path)
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -274,6 +433,33 @@ def write_srt(blocks, path) -> None:
         out.append(f"{i}\n{_srt_time(b['start'])} --> {_srt_time(b['end'])}\n{b['text']}\n")
     ensure_parent(path)
     Path(path).write_text("\n".join(out), encoding="utf-8")
+
+
+def _clip_y(tl: list[dict], default: float) -> dict[int, float]:
+    """Per-clip caption y: ``caption_y``, else ``split_at`` (default 0.45) for ``layout: lower``."""
+    out: dict[int, float] = {}
+    for c in tl:
+        raw = c["clip"] if isinstance(c.get("clip"), dict) else {}
+        v = raw.get("caption_y")
+        if v is None and raw.get("layout") == "lower":
+            v = raw.get("split_at", DEFAULT_SPLIT_AT)
+        try:
+            out[c["index"]] = float(v) if v is not None else default
+        except (TypeError, ValueError):
+            out[c["index"]] = default
+    return out
+
+
+def _card_barriers(edl: dict) -> list[tuple[float, float]]:
+    out = []
+    for ov in edl.get("overlays") or []:
+        if isinstance(ov, dict) and ov.get("region") == "card":
+            try:
+                at, dur = float(ov["at"]), float(ov["dur"])
+            except (KeyError, TypeError, ValueError):
+                continue
+            out.append((at, at + dur))
+    return sorted(out)
 
 
 def make_captions(
@@ -287,25 +473,63 @@ def make_captions(
     font: str = "Arial",
     highlight=None,
     accent: str = DEFAULT_ACCENT,
+    mode: str = "bloco",
+    case: str | None = None,
+    emphasis=None,
+    keep_under_cards: bool = False,
+    headline: str | None = None,
+    headline_y: float = 0.12,
+    headline_start: float = 0.0,
+    headline_end: float | None = None,
+    headline_box: str | None = None,
+    headline_color: str | None = None,
 ) -> dict:
     if style not in STYLES:
         raise VeditError(f"Estilo desconhecido: {style} (use viral ou limpo)")
+    if mode not in MODES:
+        raise VeditError(f"Modo desconhecido: {mode} (use {', '.join(MODES)})")
+    if case is not None and case not in CASES:
+        raise VeditError(f"Caixa desconhecida: {case} (use {', '.join(CASES)})")
     wj = edlmod.load_json(words_path, "words.json")
     edl = edlmod.load_edl(edl_path)
     fps = edlmod.resolve_fps(edl, edl_path)
     tl = mark_word_clips(edlmod.timeline(edl, fps), edl, wj.get("source") if isinstance(wj, dict) else None)
-    mw = max_words or STYLES[style]["max_words"]
-    blocks = build_blocks(wj.get("words", []), tl, mw)
+    mw = 1 if mode == "palavra" else (max_words or STYLES[style]["max_words"])
+    barriers = [] if keep_under_cards else _card_barriers(edl)
+    blocks = build_blocks(wj.get("words", []), tl, mw, barriers=barriers)
+    clip_y = _clip_y(tl, y)
+    for b in blocks:
+        if clip_y.get(b["clip"], y) != y:
+            b["y"] = clip_y[b["clip"]]
     hl = parse_highlight(highlight)
-    if hl:
-        found = {norm_word(w) for b in blocks for w in b["words"]} & hl
-        for miss in sorted(hl - found):
-            info(f"Aviso: a palavra '{miss}' (--highlight) não aparece em nenhuma legenda.")
+    em = parse_highlight(emphasis)
+    shown = {norm_word(w) for b in blocks for w in b["words"]}
+    if hl and mode == "karaoke":
+        info("Aviso: em --mode karaoke a cor de destaque é a da palavra ativa; --highlight não pinta.")
+        hl = frozenset()
+    for flag, wanted in (("--highlight", hl), ("--emphasis", em)):
+        for miss in sorted(wanted - shown):
+            info(f"Aviso: a palavra '{miss}' ({flag}) não aparece em nenhuma legenda.")
     out_cfg = edl.get("output") or {}
     w, h = int(out_cfg.get("width", 1080)), int(out_cfg.get("height", 1920))
-    write_ass(blocks, output, style, w, h, y, font, highlight=hl, accent=accent)
+    head = None
+    if headline:
+        hlines = [ln.strip() for ln in headline.split("|") if ln.strip()]
+        if not hlines:
+            raise VeditError("--headline está vazio.")
+        total = tl[-1]["offset"] + tl[-1]["duration"] if tl else 0.0
+        head = {
+            "lines": hlines, "y": headline_y, "start": headline_start,
+            "end": total if headline_end is None else headline_end,
+            "box": headline_box, "color": headline_color,
+        }  # fmt: skip
+    write_ass(blocks, output, style, w, h, y, font, highlight=hl, accent=accent, mode=mode, case=case,
+              emphasis=em, headline=head)  # fmt: skip
     srt_path = None
     if srt:
         srt_path = str(Path(output).with_suffix(".srt"))
         write_srt(blocks, srt_path)
-    return {"ass": str(output), "srt": srt_path, "blocks": len(blocks), "highlighted": sorted(hl)}
+    return {
+        "ass": str(output), "srt": srt_path, "blocks": len(blocks), "highlighted": sorted(hl),
+        "mode": mode, "headline": bool(head),
+    }  # fmt: skip

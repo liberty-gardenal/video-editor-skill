@@ -82,11 +82,15 @@ Pode: remover tempo morto, condensar contexto, separar beats, ganhar clareza. **
 
 ## 10. Punch-in
 
-Defaults: escala 1,05-1,15; duração mínima ~1,2 s; não alternar sem motivo; evitar em toda frase. Use em número, confissão, reação, mudança de argumento, prova. No `vedit`, o punch-in é um **clipe separado** na EDL com `zoom` estático diferente (o salto cai na fronteira do clipe, de preferência num corte de câmera, que o esconde), ou uma rampa linear `{"from": 1.0, "to": 1.10}` dentro de um clipe. Não existe outra curva (sem ease, sem pan animado). Zoom contínuo lento (+6-14% ao longo do plano) pela rampa serve de gancho sem cortar. Zoom com easing ou "punch" que assenta em poucos quadros: HyperFrames.
+Defaults: escala 1,05-1,15; duração mínima ~1,2 s; não alternar sem motivo; evitar em toda frase. Use em número, confissão, reação, mudança de argumento, prova. No `vedit`, o punch-in é um **clipe separado** na EDL com `zoom` estático diferente (o salto cai na fronteira do clipe, de preferência num corte de câmera, que o esconde), ou uma rampa linear `{"from": 1.0, "to": 1.10}` dentro de um clipe. Não existe outra curva (sem ease, sem pan animado). Em cortes de podcast observados (4 de 12 referências), o plano alterna enquadramento normal e punch-in de **≈1,2-1,3x a cada ~2,5-4 s**, em fronteiras de frase ou turno; é mais forte que o 1,05-1,15 acima porque o plano é aberto e o rosto pequeno. Use quando o formato for esse e cada alternância cair numa frase; é prática observada, não causa comprovada de retenção, e vira tique se for mecânica. Exemplo de EDL em `formatos-virais.md`. Zoom contínuo lento (+6-14% ao longo do plano) pela rampa serve de gancho sem cortar. Zoom com easing ou "punch" que assenta em poucos quadros: HyperFrames.
 
 ## 11. Transições
 
-Padrão: **corte seco**. Transição especial só para volta no tempo, mudança de lugar, mudança de capítulo, antes/depois, mudança de fonte visual. Sem flash branco, whip-pan nem glitch como muleta (ver `motion.md`).
+Padrão: **corte seco** (domina nas 12 referências observadas). Transição especial só para volta no tempo, mudança de lugar, mudança de capítulo, antes/depois, mudança de fonte visual. Sem flash branco, whip-pan nem glitch como muleta (ver `motion.md`). **Whip-pan é técnica de câmera**: uma referência de 11 s usa whip-pans gravados na mão; o `vedit` não os simula, e o que já está no bruto você preserva. Dissolve, glitch e rajadas radiais, quando pedidos, são do HyperFrames.
+
+### Plano longo sem corte
+
+Dois talking heads observados seguram 40-60 s sem corte (outra peça de 63 s tem um só), com o movimento vindo da legenda e do gesto. Cortar menos é válido quando a **entrega** carrega (história, emoção, humor, argumento em construção) e a legenda dá o ritmo. Isso convive com a referência de 4-8 s sem mudança visual do playbook de talking head, que é alvo para falas sem essa carga. Se mantiver o plano longo, sustente com legenda bem segmentada, manchete fixa ou um punch-in lento em rampa; se a entrega for fraca, corte. Mediana de plano das peças editadas observadas: ~1,7-3,2 s; em 3 delas os cortes se concentram nos 5 primeiros segundos.
 
 ## 12. Ritmo por perfil
 

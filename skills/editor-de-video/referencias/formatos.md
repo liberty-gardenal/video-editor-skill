@@ -23,6 +23,7 @@ A EDL é a fonte única de verdade do corte. **Uma EDL = um vídeo entregável**
 | `fps` | taxa de saída (30 por padrão). Fronteiras viram quadro inteiro: `round(t*fps)` |
 | `output` | `{"width": 1080, "height": 1920}` |
 | `clips` | lista de clipes, na ordem de saída |
+| `overlays` | opcional: b-roll sobre a timeline (ver abaixo) |
 
 ### Campos de cada clipe
 
@@ -32,7 +33,9 @@ A EDL é a fonte única de verdade do corte. **Uma EDL = um vídeo entregável**
 | `source` | fonte só deste clipe (relativa ao arquivo da EDL); sobrepõe o `source` de topo. **Imagem é fonte válida**: vira um still mostrado por `out − in` segundos, sem áudio |
 | `in`, `out` | segundos da fonte. Em imagem, só a diferença importa |
 | `speed` | 0,25 a 4,0 (padrão 1). A duração na saída é `(out − in) / speed` |
-| `layout` | `cover` (crop 9:16 em torno de `crop_x`), `split` (quadro inteiro em cima + crop fechado embaixo; recusa fonte já vertical), `fit` (sem crop, barras desfocadas) |
+| `layout` | `cover` (crop 9:16 em torno de `crop_x`), `split` (quadro inteiro em cima + crop fechado embaixo; recusa fonte já vertical), `fit` (sem crop, barras desfocadas), `lower` (locutor em cover embaixo, de `split_at` até o fim; em cima, cópia desfocada e escurecida; feito para ficar sob overlay `top`) |
+| `split_at` | só `lower`: fração da altura onde o locutor começa, 0,25 a 0,6 (padrão 0,45) |
+| `caption_y` | opcional, 0 a 1: posição vertical da legenda neste clipe |
 | `crop_x` | **centro** do crop como fração da largura da fonte (0 a 1). Número fixo, ou keyframes `[{"t": 0.0, "x": 0.4}, {"t": 2.5, "x": 0.6}]` com `t` em segundos **a partir do início do clipe**. Os keyframes são constantes por trecho: o crop salta no `t` listado, **não desliza**. O crop nunca sai do quadro |
 | `zoom` | número fixo (>= 1, padrão 1; fecha o crop) ou rampa linear `{"from": 1.0, "to": 1.10}` ao longo do clipe. Não há outra curva |
 
@@ -62,11 +65,37 @@ A EDL é a fonte única de verdade do corte. **Uma EDL = um vídeo entregável**
 
 Neste exemplo, `camera-lenta` ocupa 4 s na saída (2 s de fonte a 0,5x) e o `crop_x` salta de 0,35 para 0,65 aos 2,0 s do clipe. Os tempos de fonte são reais da mídia: confira cada `in`/`out` na transcrição, na prancha ou no `probe`.
 
+### Overlays (b-roll)
+
+Lista no topo da EDL, aplicada pelo `cut` depois de montar a timeline (um passe). Só vídeo: o áudio do overlay nunca entra; o áudio da base não muda. Corte seco.
+
+| Campo | Significado |
+|---|---|
+| `source` | vídeo ou imagem (relativo ao arquivo da EDL) |
+| `at`, `dur` | início e duração em segundos da **timeline de saída** (depois dos cortes). Sem sobreposição entre overlays; `at + dur` <= fim |
+| `region` | `full` (cover no quadro todo), `top` (cover na parte de cima), `card` (mantém a proporção, como cartão de prova; base escurecida/dessaturada/desfocada) |
+| `in` | só vídeo: início na fonte (padrão 0). Vídeo curto congela o último quadro |
+| `height`, `feather` | `top`: fração da altura (0,2 a 0,7; padrão 0,45) e px de esmaecimento da borda de baixo (padrão 60 a 1920; 0 = seca) |
+| `width`, `y` | `card`: fração da largura (padrão 0,78) e centro vertical (padrão 0,36) |
+| `zoom`, `crop_x` | número ou `{"from","to"}` (padrão: imagem 1.0→1.08, vídeo 1.0); centro do cover 0 a 1 (padrão 0,5) |
+
+Avisos: clipe `lower` com trecho sem overlay `top`; overlay `top` sobre clipe que não é `lower`.
+
+```json
+{"source": "fala.mp4", "fps": 30,
+ "clips": [{"id": "c1", "in": 1.0, "out": 9.0, "layout": "lower", "crop_x": 0.5},
+           {"id": "c2", "in": 13.3, "out": 25.3, "layout": "cover"}],
+ "overlays": [{"source": "praia.mp4", "at": 1.0, "dur": 2.5, "region": "top"},
+              {"source": "grafico.jpg", "at": 4.0, "dur": 2.0, "region": "top"},
+              {"source": "cena.mp4", "at": 9.0, "dur": 1.5, "region": "full"},
+              {"source": "print.png", "at": 13.0, "dur": 3.5, "region": "card"}]}
+```
+
 ### O que a EDL e o `vedit` NÃO fazem
 
 - **J-cut e L-cut** (áudio e vídeo cortados no mesmo quadro, com micro-fade nas junções): não existe deslocamento de áudio em relação à imagem. É conhecimento de ofício; faça no HyperFrames ou em ffmpeg manual.
 - **Pan animado** entre keyframes de `crop_x`: o crop salta. Só `zoom` tem rampa.
-- **B-roll sobreposto, overlays, gráficos**: o `vedit cut` só concatena. Composição é do HyperFrames.
+- **Transições, texto animado, keying**: os `overlays` entram e saem em corte seco, sem fade. Isso e gráficos são do HyperFrames.
 - **Legenda animada**: o `vedit captions` + `burn` entregam legenda estática por bloco. Animada é do HyperFrames.
 
 ## 3. JSON de `--guides` (`vedit sheet --guides zona.json`)
@@ -112,13 +141,14 @@ Todos aceitam `--json` (saída de máquina) e saem com código 0 em sucesso, dif
 | `init <pasta> [--source midia]` | cria a pasta da run (seção 4). Com `--source`, faz o probe da mídia, grava `00-probe.json` e preenche `source` (relativo à pasta) e `fps` da EDL |
 | `probe <midia> [--no-audio] [--count-frames]` | largura, altura, rotação, fps real, duração, codec, HDR, canais, correlação L/R, loudness e true peak |
 | `sheet <video> -o prancha.jpg [--every s] [--start s --end s] [--cols n] [--width px] [--guides zona.json]` | prancha de quadros com carimbo de tempo (se o ffmpeg tem `drawtext`) e retângulos-guia |
+| `analyze <video> -o pasta [--scene 0.3] [--region Y0:Y1] [--merge 0.15] [--hook-seconds 6] [--words w.json] [--transcribe]` | teardown de referência: `analise.json`/`analise.md` (cortes, tamanho de plano, loudness, ritmo de fala), `gancho.jpg` e `completo.jpg`; `--region` detecta cortes numa faixa (layout empilhado), `--merge` funde flashes de ~0,1 s; cena detectada é limite inferior |
 | `transcribe <midia> -o words.json [--model m] [--lang pt] [--vad]` | faster-whisper com tempo por palavra |
 | `digest <words.json> [-o digest.md] [--windows "a-b,c-d"] [--every s]` | texto compacto com carimbo de tempo para o modelo ler |
 | `silences <midia> [--noise -35] [--min 0.25] [--start s --end s]` | lista de silêncios |
 | `edges <clipe> [--noise -35] [--ms 80]` | falha se os primeiros/últimos 80 ms têm som acima do limiar (palavra truncada) |
 | `cut --edl X.json -o saida.mp4 [--preview]` | renderiza UM arquivo com todos os clipes da EDL; `--preview` em 540x960 |
 | `reframe --edl X.json [--write]` | **experimental** (exige OpenCV): sugere `crop_x` por locutor ativo; confira na prancha |
-| `captions <words.json> --edl X.json -o leg.ass [--srt] [--style viral\|limpo] [--max-words n] [--y 0.62] [--font f] [--highlight "a,b"] [--accent "#FFD400"]` | legenda ASS com tempos remapeados para o clipe final. `--highlight` pinta só as palavras que **você** listar, com a cor de `--accent`. Sem deslocamento automático de tempo |
+| `captions <words.json> --edl X.json -o leg.ass [--srt] [--style viral\|limpo] [--max-words n] [--y 0.62] [--font f] [--highlight "a,b"] [--accent "#FFD400"] [--mode bloco\|palavra\|karaoke] [--case upper\|lower\|sentence\|keep] [--emphasis "a,b"] [--keep-under-cards] [--headline "L1\|L2"] [--headline-y 0.12] [--headline-start 0] [--headline-end S] [--headline-box "#RRGGBB"] [--headline-color "#FFF"]` | legenda ASS com tempos remapeados para o clipe final. `--mode karaoke` pinta a palavra falada; `--emphasis` aumenta palavras (~130%); `caption_y`/`layout: lower` por clipe mudam o `--y`; overlays `card` silenciam a legenda; `--headline` fixa manchete (com `--headline-box` opcional). `--highlight` pinta só as palavras que **você** listar, com a cor de `--accent`. Sem deslocamento automático de tempo |
 | `burn <video> <leg.ass> -o saida.mp4 [--fallback] [--font f]` | queima a legenda (libass, ou fallback Pillow); recodifica o vídeo |
 | `loudness <midia>` | LUFS integrado, true peak, LRA |
 | `master <video> -o saida.mp4 [--lufs -14] [--tp -1.5]` | `loudnorm` em duas passadas, 48 kHz, vídeo copiado |

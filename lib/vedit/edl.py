@@ -9,7 +9,13 @@ from pathlib import Path
 from .util import VeditError
 
 IMAGE_EXTS = (".jpg", ".jpeg", ".png", ".webp", ".heic", ".heif")
-LAYOUTS = ("cover", "split", "fit")
+LAYOUTS = ("cover", "split", "fit", "lower")
+REGIONS = ("full", "top", "card")
+SPLIT_AT_DEFAULT, SPLIT_AT_MIN, SPLIT_AT_MAX = 0.45, 0.25, 0.6
+TOP_HEIGHT_DEFAULT = 0.45
+FEATHER_DEFAULT = 60  # px at 1920 tall; scaled with the output height
+CARD_WIDTH_DEFAULT, CARD_Y_DEFAULT = 0.78, 0.36
+STILL_ZOOM_DEFAULT = (1.0, 1.08)
 SPEED_MIN, SPEED_MAX = 0.25, 4.0
 ZOOM_MAX = 4.0
 
@@ -183,7 +189,189 @@ def load_edl(path) -> dict:
         clip_speed(c, label)
         zoom_range(c, label)
         _validate_crop_x(c.get("crop_x"), label)
+        _validate_lower_fields(c, label)
+    _validate_overlays(edl)
     return edl
+
+
+def _frac(c: dict, key: str, label: str, lo: float, hi: float, what: str = "Clipe"):
+    """Optional numeric field within [lo, hi]; returns None when absent."""
+    v = c.get(key)
+    if v is None:
+        return None
+    if isinstance(v, bool) or not isinstance(v, (int, float)):
+        raise VeditError(f"{what} {label}: '{key}' precisa ser um número (recebi {v!r}).")
+    if not (lo <= float(v) <= hi):
+        raise VeditError(f"{what} {label}: '{key}' deve ficar entre {lo:g} e {hi:g} (recebi {v}).")
+    return float(v)
+
+
+def _validate_lower_fields(c: dict, label) -> None:
+    _frac(c, "split_at", f"'{label}'", SPLIT_AT_MIN, SPLIT_AT_MAX)
+    _frac(c, "caption_y", f"'{label}'", 0.0, 1.0)
+
+
+def split_at(c: dict) -> float:
+    v = c.get("split_at")
+    return SPLIT_AT_DEFAULT if v is None else float(v)
+
+
+def overlay_zoom(o: dict, label: str = "?") -> tuple[float, float]:
+    """Overlay zoom (start, end): defaults to a slow push-in for stills, static for video."""
+    z = o.get("zoom")
+    if z is None:
+        return STILL_ZOOM_DEFAULT if is_image(o.get("source", "")) else (1.0, 1.0)
+    try:
+        if isinstance(z, dict):
+            if "from" not in z or "to" not in z:
+                raise VeditError(f"Overlay {label}: 'zoom' em rampa precisa de 'from' e 'to'.")
+            z0, z1 = float(z["from"]), float(z["to"])
+        elif isinstance(z, bool):
+            raise TypeError
+        else:
+            z0 = z1 = float(z)
+    except (TypeError, ValueError) as exc:
+        raise VeditError(
+            f"Overlay {label}: 'zoom' deve ser um número ou {{\"from\": 1.0, \"to\": 1.08}} (recebi {z!r})."
+        ) from exc
+    if not (1.0 <= z0 <= ZOOM_MAX and 1.0 <= z1 <= ZOOM_MAX):
+        raise VeditError(f"Overlay {label}: 'zoom' deve ficar entre 1.0 e {ZOOM_MAX}.")
+    return z0, z1
+
+
+def overlay_label(i: int) -> str:
+    return f"#{i + 1}"
+
+
+def overlay_params(o: dict) -> dict:
+    """Overlay fields with defaults applied (assumes validation already passed)."""
+
+    def g(k, d):
+        return d if o.get(k) is None else o[k]
+
+    return {
+        "region": g("region", "full"),
+        "at": float(o["at"]),
+        "dur": float(o["dur"]),
+        "in": float(g("in", 0.0)),
+        "height": float(g("height", TOP_HEIGHT_DEFAULT)),
+        "feather": float(g("feather", FEATHER_DEFAULT)),
+        "crop_x": float(g("crop_x", 0.5)),
+        "width": float(g("width", CARD_WIDTH_DEFAULT)),
+        "y": float(g("y", CARD_Y_DEFAULT)),
+        "zoom": overlay_zoom(o),
+    }
+
+
+def _validate_overlays(edl: dict) -> None:
+    ovs = edl.get("overlays")
+    if ovs is None:
+        return
+    if not isinstance(ovs, list):
+        raise VeditError("'overlays' da EDL deve ser uma lista.")
+    spans = []
+    for i, o in enumerate(ovs):
+        lab = overlay_label(i)
+        if not isinstance(o, dict):
+            raise VeditError(f"Overlay {lab} da EDL deve ser um objeto.")
+        src = o.get("source")
+        if not isinstance(src, str) or not src:
+            raise VeditError(f"Overlay {lab}: 'source' é obrigatório (caminho de vídeo ou imagem).")
+        for k in ("at", "dur"):
+            if k not in o:
+                raise VeditError(f"Overlay {lab}: falta '{k}'.")
+        at = _frac(o, "at", lab, 0.0, 1e9, "Overlay")
+        dur = _frac(o, "dur", lab, 0.0, 1e9, "Overlay")
+        if dur <= 0:
+            raise VeditError(f"Overlay {lab}: 'dur' deve ser maior que 0.")
+        region = o.get("region", "full")
+        if region not in REGIONS:
+            raise VeditError(f"Overlay {lab}: 'region' desconhecida {region!r} (use {', '.join(REGIONS)}).")
+        _frac(o, "in", lab, 0.0, 1e9, "Overlay")
+        if o.get("in") is not None and is_image(src):
+            raise VeditError(f"Overlay {lab}: 'in' só vale para vídeo (a fonte é uma imagem).")
+        _frac(o, "height", lab, 0.2, 0.7, "Overlay")
+        _frac(o, "feather", lab, 0.0, 400.0, "Overlay")
+        _frac(o, "crop_x", lab, 0.0, 1.0, "Overlay")
+        _frac(o, "width", lab, 0.3, 1.0, "Overlay")
+        _frac(o, "y", lab, 0.1, 0.9, "Overlay")
+        for k, ok in (("height", "top"), ("feather", "top"), ("width", "card"), ("y", "card")):
+            if o.get(k) is not None and region != ok:
+                raise VeditError(f"Overlay {lab}: '{k}' só vale com region '{ok}' (esta é '{region}').")
+        overlay_zoom(o, lab)
+        spans.append((at, at + dur, i))
+    spans.sort()
+    for (a0, a1, ia), (b0, b1, ib) in zip(spans, spans[1:], strict=False):
+        if b0 < a1 - 1e-6:
+            lo, hi = sorted((ia, ib))
+            raise VeditError(
+                f"Overlays {overlay_label(lo)} e {overlay_label(hi)} se sobrepõem no tempo "
+                f"({a0:g}–{a1:g}s e {b0:g}–{b1:g}s); overlays não podem se sobrepor."
+            )
+
+
+def overlay_frames(edl: dict, fps: float) -> list[dict]:
+    """Frame-snapped overlays (sorted by start): index, start/end frame, params."""
+    out = []
+    for i, o in enumerate(edl.get("overlays") or []):
+        p = overlay_params(o)
+        s = int(round(p["at"] * fps))
+        n = max(1, int(round(p["dur"] * fps)))
+        out.append({"index": i, "label": overlay_label(i), "start": s, "frames": n, "end": s + n, "o": o, **p})
+    out.sort(key=lambda x: x["start"])
+    for a, b in zip(out, out[1:], strict=False):
+        if b["start"] < a["end"]:
+            raise VeditError(
+                f"Overlays {a['label']} e {b['label']} se sobrepõem no tempo; overlays não podem se sobrepor."
+            )
+    return out
+
+
+def check_overlays_timeline(edl: dict, tl: list[dict], fps: float) -> list[dict]:
+    """Error if an overlay ends after the timeline; returns the frame-snapped overlays."""
+    total = sum(t["frames"] for t in tl)
+    ovs = overlay_frames(edl, fps)
+    for ov in ovs:
+        if ov["end"] > total:
+            raise VeditError(
+                f"Overlay {ov['label']}: at + dur ({ov['at'] + ov['dur']:g}s) passa do fim da "
+                f"timeline ({total / fps:g}s)."
+            )
+    return ovs
+
+
+def edl_warnings(edl: dict, tl: list[dict], fps: float) -> list[str]:
+    """Non-fatal editorial warnings (pt-BR) about lower clips and top overlays."""
+    ovs = overlay_frames(edl, fps)
+    warns: list[str] = []
+    for t in tl:
+        s = round(t["offset"] * fps)
+        e = s + t["frames"]
+        lay = t["clip"].get("layout", "cover")
+        tops = sorted((max(o["start"], s), min(o["end"], e)) for o in ovs if o["region"] == "top")
+        tops = [(a, b) for a, b in tops if a < b]
+        if lay == "lower":
+            gaps, pos = [], s
+            for a, b in tops:
+                if a > pos:
+                    gaps.append((pos, a))
+                pos = max(pos, b)
+            if pos < e:
+                gaps.append((pos, e))
+            gaps = [g for g in gaps if g[1] - g[0] > 2]
+            if gaps:
+                txt = ", ".join(f"{a / fps:.1f}–{b / fps:.1f}s" for a, b in gaps[:4])
+                warns.append(
+                    f"Clipe '{t['id']}' (layout 'lower') tem trechos sem overlay 'top' ({txt}): "
+                    "a parte de cima fica só com o fundo desfocado."
+                )
+        elif tops:
+            txt = ", ".join(f"{a / fps:.1f}–{b / fps:.1f}s" for a, b in tops[:4])
+            warns.append(
+                f"Overlay 'top' sobre o clipe '{t['id']}' (layout '{lay}', {txt}): vai cobrir o rosto; "
+                "use layout 'lower' nesse clipe."
+            )
+    return warns
 
 
 # --------------------------------------------------------------------- sources
@@ -196,7 +384,10 @@ def source_key(edl: dict, clip: dict | None = None) -> str:
 
 
 def resolve_source(edl: dict, edl_path, clip: dict | None = None) -> str:
-    src = source_key(edl, clip)
+    return resolve_path(source_key(edl, clip), edl_path)
+
+
+def resolve_path(src: str, edl_path) -> str:
     p = Path(src)
     if p.is_absolute() and p.exists():
         return str(p)

@@ -66,6 +66,21 @@ def metrics(edl_path, words_path=None) -> dict:
         "longest_uncut": round(max(c["duration"] for c in tl), 3),
         "per_clip": [{"id": c["id"], "duration": round(c["duration"], 3)} for c in tl],
     }
+    if edl.get("overlays"):
+        ovs = edlmod.check_overlays_timeline(edl, tl, fps)
+        total_f = sum(c["frames"] for c in tl)
+        points = {0, total_f}
+        acc = 0
+        for c in tl:
+            acc += c["frames"]
+            points.add(acc)
+        for o in ovs:
+            points.update((o["start"], o["end"]))
+        pts = sorted(points)
+        res["overlays"] = len(ovs)
+        res["overlays_per_min"] = round(len(ovs) / (total / 60), 2) if total else 0
+        res["overlays_per_10s"] = round(len(ovs) / (total / 10), 2) if total else 0
+        res["longest_without_visual_change"] = round(max(b - a for a, b in zip(pts, pts[1:], strict=False)) / fps, 3)
     if words_path:
         wj = edlmod.load_json(words_path, "words.json")
         words = wj.get("words", [])

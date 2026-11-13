@@ -1,6 +1,6 @@
 > **Leia quando** for gerar, corrigir, posicionar ou queimar legendas em vídeo vertical, ou revisar a legibilidade de texto na tela.
-> **Comandos:** `vedit transcribe`, `vedit captions` (`--style viral|limpo`, `--max-words`, `--y` padrão 0.62, `--srt`, `--highlight`, `--accent`), `vedit burn`, `vedit sheet --guides` (formato em `formatos.md`).
-> **Limite:** o `vedit` gera legenda estática por bloco. Legenda animada (palavra a palavra com easing, pílulas, CSS) é do HyperFrames.
+> **Comandos:** `vedit transcribe`, `vedit captions` (`--style viral|limpo`, `--max-words`, `--y` padrão 0.62, `--srt`, `--highlight`, `--accent`, `--mode bloco|palavra|karaoke`, `--case upper|lower|sentence|keep`, `--emphasis`, `--headline*`, `--keep-under-cards`), `vedit burn`, `vedit sheet --guides` (formato em `formatos.md`).
+> **Limite:** o `vedit` gera legenda estática (bloco, palavra ou karaoke com palavra acesa). Texto animado ou digitado, easing, pílulas, cor por falante e legenda bilíngue são do HyperFrames.
 
 # Legendas
 
@@ -43,11 +43,14 @@ Registre toda correção (lista de `transcript_corrections`) para o humano revis
 
 ## 5. Ênfase: acento raro funciona porque é raro
 
+O padrão da skill é conservador: legenda branca, acento raro. Em 5 de 12 referências virais observadas não há destaque nenhum; as demais usam salto de tamanho (3), palavra acesa (1) ou cor. Os estilos mais densos (seção 9) são **escolhas deliberadas, casadas com um formato** (`formatos-virais.md`), não o novo padrão. Se o usuário não pediu um estilo, use o padrão.
+
 - Medição em referência de estilo (talking head vertical): ~94% das linhas em branco puro, 3,5% e 2,4% em cor. Pintar a palavra-chave em toda frase **mata** o dispositivo.
 - Máximo 1-3 palavras por beat, e com >= 2 blocos normais entre destaques; quando há, a palavra de ênfase fica **sozinha** no bloco (ou claramente separada). Candidatas: número, contraste, verbo de mudança, conclusão, nome essencial.
 - **Não há destaque automático.** O destaque é a lista explícita que o editor (você) passa: `--highlight "palavra1,palavra2"` pinta só essas palavras, na cor de `--accent` (ex.: `"#FFD400"`). Sem `--highlight`, a legenda sai toda em branco. Escolha as palavras lendo o digest, nunca por regra.
 - **Nunca destaque um número ou afirmação contestável** ("100%", estimativa, cifra que o falante corrige): o destaque dá autoridade que a fala não tem. Quando o falante se corrige, vale o último número.
 - Cor tem função: um acento principal por vídeo; se usar vermelho/verde por semântica (alarme x solução), mantenha o código no vídeo inteiro.
+- **Ênfase por tamanho** (`--emphasis "a,b"`): a palavra ou frase listada sai num bloco bem maior (observado em 3 de 12, em números e frases-chave). Mesma disciplina do acento: poucas por vídeo, só o que é verificável, o bloco ampliado continua dentro das zonas seguras. Tamanho ou cor: escolha **um** vetor por vídeo; os dois juntos pesam. Tamanho funciona melhor em caixa alta e em bloco curto; cor, em frase/minúscula.
 
 ## 6. Corte seco + cadência, em vez de easing por bloco
 
@@ -57,7 +60,7 @@ Medido em referência (30 fps): a entrada do bloco tem ~93% da massa no 1º quad
 
 | Item | Default | Observação |
 |---|---|---|
-| Faixa de legenda | `--y 0.62` (padrão do `vedit captions`; centro do texto em y ~1190 de 1920, dentro da faixa 1040-1220 e acima da zona de interface). Para talking head com o rosto alto no quadro, `--y` 0.70 a 0.78 (faixa ~1270-1540, abaixo do queixo) | **sempre** confirme numa prancha com `vedit sheet --guides` (retângulo do rosto no pior quadro + retângulo da faixa): se cruzam, mova `--y` ou reenquadre |
+| Faixa de legenda | A posição **segue o layout**: tela cheia `--y 0.62` (ou 0,62-0,78 conforme o rosto); layout empilhado (`lower`, janela de b-roll em cima) na **costura**, y ≈ 0,43-0,50, que é o padrão dos clipes `lower` (ajuste por clipe com `caption_y`). `--y 0.62` (padrão do `vedit captions`; centro do texto em y ~1190 de 1920, dentro da faixa 1040-1220 e acima da zona de interface). Para talking head com o rosto alto no quadro, `--y` 0.70 a 0.78 (faixa ~1270-1540, abaixo do queixo) | **sempre** confirme numa prancha com `vedit sheet --guides` (retângulo do rosto no pior quadro + retângulo da faixa): se cruzam, mova `--y` ou reenquadre |
 | Zona livre geral | topo ~14% (~270 px), base ~35% (~670 px), laterais ~6% (~65 px) | números da Meta para Reels/Stories; TikTok não publica pixels fixos |
 | Conservador (todas as plataformas) | margem esq. 90, dir. 170, topo 160, base 310 px; sem texto crítico em y > ~1250 | direita maior por causa dos botões laterais |
 | Largura de linha | p90 ~0,48 da largura em estilo viral; nunca passar da zona lateral | |
@@ -71,9 +74,19 @@ A altura sobre o peito, sobre roupa escura, já dá contraste em talking head; s
 
 Cena de motion que já tem texto próprio não aguenta uma segunda tipografia por cima. Regras: legenda corre nas janelas livres e **cala** sob os motions; janela livre < 2 s fica sem legenda (pisca entre dois motions lê como defeito); a troca de cor (claro/escuro) depende do tipo de saída da cena, não da janela inteira. Frase de impacto só entra em janela sem motion. Mede-se no **pior quadro** da janela.
 
-## 9. Palavra por palavra: só se justificado
+**Sob cartões de prova** (`overlays` com `region: "card"`): o `vedit captions` **descarta os blocos** que caem sob um cartão, para a legenda não colidir com o texto dele (defeito observado em uma referência). `--keep-under-cards` desliga isso; só use se o cartão não tiver texto. Palavra dita sob o cartão fica sem legenda: confirme que a fala continua inteligível (a prova está na tela). Janela livre < 2 s entre cartões, sem legenda.
 
-Movimento constante divide atenção. Use quando: tempos por palavra confiáveis, fala curta, imagem simples, estilo pedido. Default: blocos por frase curta. **O `vedit captions` não faz palavra a palavra nem animação**: isso é do HyperFrames (skill `/hyperframes:embedded-captions`) ou de um `.ass` escrito à mão. Em libass, `\t` de alfa por palavra no meio da linha não funcionou (0.17); faça um evento por palavra com as seguintes em `\alpha&HFF&` (layout fixo, palavras acendendo).
+## 9. Modos e caixa: bloco, palavra, karaoke
+
+| Modo (`--mode`) | O que faz | Quando serve | Custo |
+|---|---|---|---|
+| `bloco` (padrão) | 2-4 palavras por bloco, corte seco | quase tudo; leitura em 1 olhada | nenhum |
+| `palavra` | uma palavra por bloco, troca a cada ~0,3-0,5 s | fala curta e densa, imagem simples, estilo pedido (3 de 12, sempre em caixa alta) | **conforto de leitura**: o texto pisca, o olho não tem contexto de frase, abaixo de ~0,3 s não se lê; ruim para frase longa, palavra técnica e quem lê rápido pouco |
+| `karaoke` | bloco de frase com a palavra ativa acesa e as anteriores esmaecidas | frase de 4-8 palavras em que o ritmo da leitura importa (1 de 12) | mais ruído visual; a cor de "ativa" vira o acento do vídeo |
+
+- Movimento constante divide atenção: `palavra` só com tempos por palavra confiáveis (`words.json` refinado) e conteúdo que aguenta. Se um bloco de 1 palavra cair abaixo de ~0,3 s, o `--mode palavra` não ajuda: use `bloco`.
+- Caixa (`--case`): `sentence` (frase) ou `lower` leem melhor em fala corrida (6 de 12); `upper` combina com `palavra` e com ênfase por tamanho (5 de 12); `keep` preserva a grafia da transcrição. Não misture caixas no mesmo vídeo.
+- Entrada continua em corte seco (seção 6); easing, entrada digitada, pílula e cor por falante **não** são do `vedit`: HyperFrames (`/hyperframes:embedded-captions`) ou `.ass` escrito à mão. Em libass, `\t` de alfa por palavra no meio da linha não funcionou (0.17); um evento por palavra com as seguintes em `\alpha&HFF&` (layout fixo, palavras acendendo) resolve se precisar de algo que o `karaoke` não cobre.
 
 ## 10. libass x fallback
 
@@ -84,11 +97,35 @@ Movimento constante divide atenção. Use quando: tempos por palavra confiáveis
 
 ## 11. Capa / título
 
-- Texto curto de 2 linhas (<= ~14 caracteres por linha a ~110 px), caixa clara arredondada (raio ~3% da largura) com sombra suave, aplicada **só no quadro 0** quando a plataforma usa o 1º quadro como capa; gráficos na introdução abaixo da faixa do título.
+- Texto curto de 2 linhas (<= ~14 caracteres por linha a ~110 px), caixa clara arredondada (raio ~3% da largura) com sombra suave, aplicada **só no quadro 0** quando a plataforma usa o 1º quadro como capa; gráficos na introdução abaixo da faixa do título. Isto é a **capa** (quadro 0); a manchete que permanece na tela durante o vídeo está na seção 12.
 - Instagram e TikTok permitem escolher o quadro de capa na publicação e o grid do perfil recorta (hoje com proporção 3:4 no Instagram; **confirme**). Mantenha o texto da capa no terço central do 9:16.
 - Capa mentirosa (promete algo que o vídeo não entrega) reprova no portão editorial.
 
-## 12. Checklist
+## 12. Manchete fixa
+
+Texto fixo no alto ou na costura durante parte do vídeo ou ele todo (6 de 12; manchete já no quadro 0 em 7 de 12 vídeos). Variantes observadas:
+
+| Variante | Duração | Nota |
+|---|---|---|
+| Faixa ou fita com caixa alta e palavras-chave em amarelo, na costura ou embaixo | do ~3 s ao fim | combina com formato empilhado |
+| Caixa amarela por linha | só os ~3 s iniciais | função de gancho |
+| Manchete empilhada em duas cores | só os ~3 s finais | função de fechamento |
+| Rótulo pequeno de série, fixo no topo | o vídeo todo | marca, não gancho |
+| Manchete fixa na costura (y ~0,35-0,52), do início ao fim | o vídeo todo | observada em várias referências de formato empilhado; `--headline-y 0.42 --headline-end` na duração do vídeo |
+| Manchete atrasada: entra no momento da virada (payoff) | do payoff ao fim | observada em uma referência; `--headline-start` no tempo da virada |
+
+```bash
+vedit captions 01-words.json --edl edl/c1.json -o out/c1/leg.ass --headline "LINHA 1|LINHA 2" --headline-y 0.12 --headline-start 0 --headline-end 3 --headline-box "#FFD400" --headline-color "#000000"
+```
+
+- **Máximo ~2 linhas**, curtas (<= ~18-22 caracteres por linha); `|` separa as linhas. Mais que isso vira parágrafo que ninguém lê.
+- **Zonas seguras**: dentro das do plano (topo >= 14% / ~270 px, laterais ~6%); `--headline-y` 0,12 fica na borda, confira numa prancha com `--guides`. Se a plataforma cobre o topo com interface, desça. Na costura, não cubra o rosto.
+- Duração: decida pela **função**, não por um número. Gancho (~3 s no início), fechamento (~3 s no fim) ou fixa o vídeo inteiro (rótulo/título do formato empilhado, na costura) são escolhas coerentes; entrada atrasada serve para destacar a virada. A pior escolha é a duração **intermediária sem função** (some no meio do vídeo sem marcar gancho, virada nem fim), porque compete com a legenda à toa. Manchete fixa o vídeo todo é prática observada em formato empilhado, não prova de desempenho. `--headline-start`/`--headline-end` (segundos de saída) e `--headline-y` cobrem todos os casos.
+- A manchete **não substitui** a legenda e não pode colidir com ela: se a manchete fica na costura, afaste a legenda (`--y`) para o outro lado da costura; senão, legenda na costura e manchete acima.
+- Texto da manchete é **texto inventado** por você: entra na lista de revisão (regra 9). Nunca promete o que o vídeo não entrega (capa mentirosa, seção 11).
+- Animada, digitada ou com segundo tipo de letra (itálico serifado na palavra de destaque): HyperFrames.
+
+## 13. Checklist
 
 - [ ] Nenhum bloco sobrepõe outro ou atravessa corte
 - [ ] Faixa não cobre rosto no pior quadro; dentro das zonas seguras
@@ -96,6 +133,9 @@ Movimento constante divide atenção. Use quando: tempos por palavra confiáveis
 - [ ] Números e nomes conferidos contra o áudio
 - [ ] Acentos <= 1-3 por beat e raros no vídeo
 - [ ] Legenda é a última camada
+- [ ] Modo e caixa casam com o formato; um só vetor de ênfase (cor **ou** tamanho)
+- [ ] Nenhum bloco sob cartão de prova; manchete <= 2 linhas e dentro das zonas seguras
+- [ ] Todo texto queimado conferido contra o áudio (sem erro de transcrição)
 
 ## Fontes
 - Netflix, "Brazilian Portuguese Timed Text Style Guide", https://partnerhelp.netflixstudios.com/hc/en-us/articles/215600497-Portuguese-Brazil-Timed-Text-Style-Guide (aberta em 2026-11: 42 caracteres/linha, 2 linhas, 17 cps adulto/13 infantil, regras de quebra).

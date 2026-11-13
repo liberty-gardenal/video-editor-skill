@@ -30,6 +30,23 @@ Estilo de referência = princípios gerais de motion editorial/colagem (papel, o
 - **Número estimado nunca em tipografia de dado limpa** (ganha autoridade que a fala não tem): use marcador manual (hachura, número à mão) ou não use. Se o falante se corrige, o número que vale é o último.
 - Registre a tabela do que ficou de fora, com o motivo; evita refazer a discussão.
 
+### 3b. B-roll por palavra-chave e cartões de prova (observado)
+
+Em 5 de 12 referências virais (pt-BR, verticais) a imagem da janela de b-roll mostra **a coisa quando ela é nomeada**; em 2, uma montagem de inserts de 0,7-2 s abre o vídeo (3+ trocas de imagem nos 3 s iniciais). Cartões de prova (print ou estatística, ~75% da largura, centro em y ≈ 0,30-0,36, 1,5-3 s) apareceram em uma referência com ~9 cartões e como cartão de referência no gancho de outra. É prática observada, não causa comprovada de retenção, e vale a mesma triagem da seção 3: objeto concreto, número verificável, prova mostrável.
+
+- **Cadência da janela**: 1,5-3 s por imagem (4-6 por 10 s nos trechos densos); montagem de gancho em tela cheia, 0,7-2 s. Cada troca nasce numa palavra (seção 2, ±3 quadros). Imagem de enchimento sem palavra que a peça é defeito (`armadilhas.md`).
+- **Cobertura**: as referências cobriram de 40 a 100% do tempo com janela de b-roll. Isso conflita com a meta de 30-40% de motion da seção 4. Reconciliação: a meta de 30-40% vale para **motion desenhado** (cenas de objeto, anotação) que cobre o rosto; a janela de b-roll em layout `lower` **não cobre o rosto** (o apresentador continua visível embaixo) e pode passar disso. Cobertura total em tela cheia continua sendo falha por esconder o rosto.
+- **Cartão de prova no `vedit`**: `overlays` com `region: "card"` (`width`, `y`); a legenda cala sob o cartão (`legendas.md`, seção 8). Base escurecida, em cinza e desfocada, número circulado, cantos arredondados e sombra do cartão: HyperFrames.
+
+### 3c. O que o `vedit` faz e o que é do HyperFrames
+
+| Necessidade | `vedit` (EDL `overlays`) | HyperFrames |
+|---|---|---|
+| imagem ou vídeo em janela de cima, tela cheia ou cartão, no tempo de saída | sim: `region` `top`/`full`/`card`, `at`, `dur`, `feather`, `zoom`, `crop_x` | |
+| camada só de vídeo; áudio base intocado; sem sobreposição entre overlays | sim | |
+| entradas animadas, transições (dissolve, glitch, whip), máscara atrás do sujeito, cantos arredondados, sombra, PiP com etiqueta, texto digitado | | sim |
+| cena de motion desenhada (registros da seção 5), explicador animado | | sim |
+
 ## 4. Densidade e respiro
 
 - Meta: **30-40% do clipe coberto por motion**. Abaixo de ~20% o vídeo fica parado; acima de ~50% o rosto some.
@@ -92,7 +109,7 @@ Não gere vídeo por IA de vídeo para isto: composição por camadas dá contro
 
 ## 9. Saídas
 
-Cutaway que cobre o vídeo: entrada em corte seco com o herói **já em voo no quadro 0** (o corte é a revelação). Saída **alternando três tipos**: `slide` (a mesa é puxada para fora), `wipe` (uma folha cruza a lente) e `push` (a câmera acelera para dentro e o corte cai na velocidade); ~13 quadros (~0,43 s) com aceleração. Corte seco sozinho lê como tranco; repetir a mesma saída vira tique. **Sem flash branco, whip-pan ou glitch**: se pedirem flash, entregue o `wipe` (mesmo clarão, mas material); se pedirem efeito de câmera, o `push`. Overlay sobre o vídeo: entra animado com trajetória e volta por onde entrou, fitas e anotações presas ao objeto.
+Cutaway que cobre o vídeo: entrada em corte seco com o herói **já em voo no quadro 0** (o corte é a revelação). Saída **alternando três tipos**: `slide` (a mesa é puxada para fora), `wipe` (uma folha cruza a lente) e `push` (a câmera acelera para dentro e o corte cai na velocidade); ~13 quadros (~0,43 s) com aceleração. Corte seco sozinho lê como tranco; repetir a mesma saída vira tique. **Sem flash branco, whip-pan ou glitch** (as referências virais observadas usam dissolve na abertura em 1 de 12, glitch em 1, rajada radial em 1 e whip-pan de câmera em 1; a skill mantém corte seco como padrão e o `vedit` não faz essas transições): se pedirem flash, entregue o `wipe` (mesmo clarão, mas material); se pedirem efeito de câmera, o `push`. Overlay sobre o vídeo: entra animado com trajetória e volta por onde entrou, fitas e anotações presas ao objeto.
 
 ## 10. Acabamento "feito à mão" e custo
 
@@ -135,7 +152,7 @@ neon, glow, bloom, HDR, gradiente decorativo, 3D plástico, dashboard "SaaS", ca
 
 ## 15. Handoff: do corte ao motion e de volta
 
-O `vedit` não compõe overlays, B-roll, gráficos nem legenda animada: isso é do HyperFrames (`/hyperframes:hyperframes` e as skills dele). O fluxo:
+O `vedit` compõe **inserts simples** (janela de b-roll, tela cheia e cartão, via `overlays` da EDL; seção 3c). Gráficos desenhados, motion editorial e legenda animada são do HyperFrames (`/hyperframes:hyperframes` e as skills dele). O fluxo:
 
 ```
 vedit cut --edl X.json -o out/limpo.mp4      # vertical limpo, sem legenda

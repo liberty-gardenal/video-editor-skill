@@ -197,6 +197,19 @@ def arg_color(s: str) -> str:
     return "#" + m.group(1).upper()
 
 
+def arg_frac(s: str) -> float:
+    """argparse ``type=``: a fraction between 0 and 1."""
+    try:
+        v = float(str(s).replace(",", "."))
+    except ValueError:
+        raise argparse.ArgumentTypeError(
+            f"Valor inválido: '{s}' (use um número entre 0 e 1, ex.: 0.12)"
+        ) from None
+    if not 0.0 <= v <= 1.0:
+        raise argparse.ArgumentTypeError(f"Valor fora do intervalo: '{s}' (use de 0 a 1)")
+    return v
+
+
 def fmt_ts(t: float) -> str:
     """mm:ss.s"""
     t = max(0.0, t)

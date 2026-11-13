@@ -64,6 +64,7 @@ Se for inferível, siga com o padrão e diga qual padrão usou.
 | Só um áudio de narração (ou roteiro + voz) e quer vídeo com motion | `playbooks/motion-de-narracao.md` |
 | Vários clipes de celular sem narração (evento, bastidores, passeio) | `playbooks/montagem-na-batida.md` |
 | Fotos e vídeos de um cliente + narração, para anúncio pago | `playbooks/anuncio-footage-real.md` |
+| "Tenho vídeos de referência", "quero nesse estilo" | `playbooks/estudar-referencia.md` (antes do playbook do material) |
 
 Pedido misto: escolha o playbook do material principal e traga só a fase que falta do
 outro (ex.: cortar um podcast e depois pôr motion nos clipes).
@@ -73,10 +74,12 @@ outro (ex.: cortar um podcast e depois pôr motion nos clipes).
 | Necessidade | Quem faz |
 |---|---|
 | Probe, transcrição, silêncios, corte, vertical, reframe, still de imagem, `speed`, rampa de zoom | `vedit` |
-| Legenda queimada simples (ASS) | `vedit captions` + `vedit burn` |
+| Legenda queimada (ASS): bloco, palavra ou karaoke, caixa, ênfase por tamanho, manchete fixa | `vedit captions` + `vedit burn` |
+| Medir um vídeo de referência (cortes, ritmo, loudness, gancho) | `vedit analyze` |
+| B-roll simples sobre o vídeo (janela de cima, tela cheia, cartão), clipe `lower` | `vedit cut` (EDL `overlays`) |
 | Legenda animada, cartões, gráficos, lower-thirds, cena de motion, card final | HyperFrames (skills abaixo) |
 | Mix de música com ducking, troca de áudio (`extract-audio` + `mux`), loudness, master | `vedit mix`, `vedit mux`, `vedit master` |
-| J-cut/L-cut, pan animado, B-roll ou overlay sobre o vídeo | **não disponível no `vedit`**: HyperFrames ou ffmpeg manual |
+| J-cut/L-cut, pan animado, transições (dissolve, glitch, whip), texto animado ou digitado, matte/oclusão, cantos arredondados e sombra, PiP | **não disponível no `vedit`**: HyperFrames ou ffmpeg manual |
 | Medir e aprovar o arquivo final | `vedit verify` |
 
 Skills do HyperFrames, quando instalado como plugin (`/hyperframes:<nome>`): `hyperframes`
@@ -156,6 +159,7 @@ resultado de outro agente a quem deve julgar de forma independente.
 | `referencias/armadilhas.md` | antes de renderizar e ao depurar (erros que já custaram horas) |
 | `referencias/plataformas.md` | for limites de duração, áreas seguras e specs por plataforma |
 | `referencias/narracao-tts.md` | quando a narração for gerada por TTS ou precisar de tratamento |
+| `referencias/formatos-virais.md` | o pedido for "nesse estilo" ou for escolher o formato (janela de b-roll, corte de podcast, manchete fixa, cartões de prova); evidência observada de 12 referências |
 | `referencias/formatos.md` | for escrever `words.json`, EDL (todos os campos, multi-fonte), JSON de `--guides`, pasta da run ou conferir a sintaxe de um subcomando |
 
 ## Entrega

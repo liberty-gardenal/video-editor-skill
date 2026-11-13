@@ -116,6 +116,16 @@ afirmação contestável); sem ela não há destaque. Confira legenda × rosto e
 segura. Legenda animada ou motion: entregue o vertical limpo ao HyperFrames (handoff em
 `referencias/motion.md`, seção 15).
 
+### Passo opcional: janela de b-roll, cartões de prova e manchete
+Para cortes de podcast no estilo observado em vídeos publicados (receitas em
+`referencias/formatos-virais.md`; prática observada, não causa comprovada de retenção). O
+`ve-edit-director` registra no `04-plan.json`, por `id`, o que cada insert mostra e em que
+palavra entra.
+- EDL: clipes `layout: "lower"` onde há b-roll em cima; `overlays` (`region` `top`/`full`/`card`, `at` em tempo de saída, sem sobreposição) com material do usuário ou licenciado.
+- Alternância de punch-in (≈1,2-1,3x a cada ~2,5-4 s, nas fronteiras de frase ou turno) como clipes com `zoom` diferente.
+- Legenda: `--mode`, `--case`, `--emphasis`, e manchete fixa com `--headline "L1|L2" --headline-start 0` (até 2 linhas, dentro das zonas seguras). Sob cartões a legenda cala.
+Sem b-roll de verdade a mostrar, não force: a janela vazia é falha (`armadilhas.md`).
+
 ## Fase 11 — render, master, verificação (por `id`)
 ```bash
 for id in c1 c2 c3; do
@@ -139,6 +149,7 @@ Música de fundo num corte é opcional: use a cadeia `extract-audio` → `mix` �
 - [ ] Sem clipes duplicados pelo sentido; nenhum aprovado de primeira sem revisão.
 - [ ] Uma EDL por short; EDL em quadro inteiro; `edges` limpo; nenhuma palavra inventada.
 - [ ] Rosto inteiro no crop; legenda fora do rosto e da área segura.
+- [ ] Se usou `overlays`: `top` só sobre `lower`, sem sobreposição, legenda calada sob cartões, manchete em até 2 linhas.
 - [ ] `vedit verify` passou no arquivo final, por plataforma.
 - [ ] Usuário foi avisado de que o áudio precisa ser ouvido por ele.
 - [ ] Nenhuma promessa de desempenho.

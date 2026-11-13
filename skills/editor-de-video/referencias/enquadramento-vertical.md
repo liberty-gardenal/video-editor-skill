@@ -1,5 +1,5 @@
 > **Leia quando** for converter vídeo horizontal (ou de câmera aberta) em 9:16: escolher crop, layout, quem enquadrar, como rastrear, ou compor cartões e recortes de cabeça.
-> **Comandos:** `vedit probe`, `vedit sheet --guides`, `vedit reframe`, `vedit cut` (layouts `cover`/`split`/`fit`). Decida geometria e faixa de legenda **juntas**, num quadro real, antes de qualquer etapa cara.
+> **Comandos:** `vedit probe`, `vedit sheet --guides`, `vedit reframe`, `vedit cut` (layouts `cover`/`split`/`fit`/`lower`). Decida geometria e faixa de legenda **juntas**, num quadro real, antes de qualquer etapa cara.
 
 # Enquadramento vertical
 
@@ -33,12 +33,22 @@ Ausência de corte de câmera não significa enquadramento estático. Olhe a lar
 | `cover` | uma pessoa, ou locutor cabe sozinho no 9:16 | crop 9:16 ancorado em `crop_x` (0-1) sobre a altura da fonte: `w = floor(altura*9/16)` (par) |
 | `split` | 2-3 pessoas no mesmo plano que não cabem num crop estreito | metade de cima = **quadro inteiro sem crop em altura natural**; baixo = crop fechado em quem fala |
 | `fit` | conteúdo que não pode ser cortado (tela, gráfico) | quadro inteiro centralizado, barras com fundo desfocado |
+| `lower` | uma pessoa falando, com **janela livre em cima** para b-roll, print ou gráfico | apresentador na região de baixo (`split_at`, padrão 0,45 = a janela ocupa ~45% da altura e o apresentador os ~55% de baixo); a região de cima fica livre para `overlays` `region: "top"`; legenda na costura (`caption_y`) |
 
 - `split` com fonte 1920x1080: o quadro inteiro escalado a 1080 de largura tem 608 px de altura; sobram 1312 px para o crop fechado. A altura natural é o que impede distorção e metade preta.
 - Nunca deixe metade do `split` preta ou vazia; sem conteúdo extra, repita o mesmo plano mais aberto, nunca cor sólida. Fonte já vertical **não aceita** `split` (degenerado): recuse.
 - A altura varia entre arquivos do mesmo celular (ex.: 1840 vs 1824): calcule o crop pela altura de cada arquivo.
 - Nunca corte um rosto na borda do crop. O recorte 9:16 do layout A fica **centrado no sujeito**, não no centro geométrico.
 - Não aplique saturação, sharpen ou glow automáticos no enquadramento.
+
+### `lower` e a janela de cima
+
+- Observado em 5 de 12 referências virais (janela central nos cinco): janela de b-roll ~45% da altura, apresentador nos ~55% de baixo, costura em degradê suave (`feather` no overlay). A janela troca de imagem a cada 1,5-3 s e cobre de 40 a 100% do tempo; **alterna com apresentador em tela cheia** (`cover`) nos cortes, em vez de ficar empilhado o vídeo inteiro. Receita completa em `formatos-virais.md`. É prática observada, não causa comprovada de retenção.
+- Sem overlay na região de cima, um clipe `lower` deixa a metade de cima **vazia**: só use `lower` quando houver overlay cobrindo o clipe (a regra de nunca deixar meia tela vazia vale). Ao contrário, `overlays` com `region: "top"` sobre um clipe que **não** é `lower` cobrem o rosto: proibido.
+- Com o apresentador em ~55% da altura, o rosto precisa caber ali: confira numa prancha com `--guides` (rosto, costura, faixa de legenda) antes do render.
+- Legenda na costura (y ≈ 0,43-0,50) pelo padrão do `lower`; se o rosto estiver alto, use `caption_y` abaixo do queixo.
+- **Tela preta com conteúdo menor** (3:4 em tela 9:16, 1 de 12) é um layout de canvas: o `vedit` não tem esse layout; o padrão da skill é preencher o 9:16. Só faça se a fonte for 3:4 e o usuário pedir; as faixas pretas de topo e base ficam livres para legenda ou manchete (confira zonas seguras).
+- Cantos arredondados, sombra na costura ou recorte da cabeça sobre a janela: composição de HyperFrames (seção 7).
 
 ## 5. Quando trocar o enquadramento
 
@@ -99,7 +109,7 @@ Se o texto precisa ir onde há rosto, desloque abaixo do queixo mais baixo da ja
 - [ ] `vedit probe` conferido (fps real, rotação, HDR, canais)
 - [ ] Prancha de enquadramento com zonas seguras aprovada
 - [ ] Nenhuma troca de crop dentro de palavra
-- [ ] `split` sem metade vazia; `cover` sem rosto cortado
+- [ ] `split` sem metade vazia; `lower` só com overlay na região de cima; `cover` sem rosto cortado
 - [ ] Cores fortes ok após HDR->SDR
 - [ ] 4:5 (se pedido) sai por crop do master 9:16: `crop=1080:1350:0:285` com conteúdo entre y 340 e 1000 (ver `plataformas.md`)
 
