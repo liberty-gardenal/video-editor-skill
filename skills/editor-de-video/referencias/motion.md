@@ -152,6 +152,11 @@ neon, glow, bloom, HDR, gradiente decorativo, 3D plástico, dashboard "SaaS", ca
 
 ## 15. Handoff: do corte ao motion e de volta
 
+> Padrão aprovado: **uma** composição HyperFrames transparente do comprimento do vídeo
+> (ProRes 4444), sincronizada pela lista de palavras na timeline de saída, aplicada com
+> `vedit composite` (motion por baixo, legenda por cima, SFX misturado). Roteiro de batidas,
+> zonas e brief em `padrao-excelencia.md`.
+
 O `vedit` compõe **inserts simples** (janela de b-roll, tela cheia e cartão, via `overlays` da EDL; seção 3c). Gráficos desenhados, motion editorial e legenda animada são do HyperFrames (`/hyperframes:hyperframes` e as skills dele). O fluxo:
 
 ```

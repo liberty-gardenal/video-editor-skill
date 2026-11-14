@@ -104,6 +104,9 @@ junto da pessoa; `fit` quando não pode cortar nada. Rosto cortado na borda ou m
 vazia são falha.
 
 ## Fase 10 — legendas (por `id`)
+> Corte com motion ou pedido de alta qualidade: legenda, motion e composite seguem
+> `referencias/padrao-excelencia.md`, que é também o checklist de aprovação de cada `id`.
+
 A legenda padrão fica em `--y 0.62` (centro do texto a 62% da altura). Antes de aceitar,
 desenhe a faixa e o rosto numa prancha com guias (formato do `zona.json` em
 `referencias/formatos.md`) e mova `--y` só se a faixa cobrir o rosto no pior quadro.

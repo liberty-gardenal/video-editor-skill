@@ -86,6 +86,17 @@
 | 95 | Overlay `top` sobre clipe que não é `lower` | b-roll cobre o rosto | `top` só sobre `lower`; o `ve-qc` confere |
 | 96 | `lower` sem overlay na região de cima | metade do quadro vazia | `cover` onde não há b-roll |
 | 97 | Overlays sobrepostos no tempo | o `cut` recusa ou mostra a imagem errada | um overlay por vez; deixe intervalo entre eles |
+| 98 | `lower` com a metade de cima só desfocada (motion "depois") | o usuário lê como corte quebrado | `cover` em tela cheia; motion por cima como trilha transparente (`padrao-excelencia.md`) |
+| 99 | Manchete em caixinha pequena fixa por vários segundos | "nada profissional" | gancho cinético grande nos 2 primeiros s, depois sai |
+| 100 | Legenda com corpo ~111 em fonte condensada | altura de caixa alta ~45 px, some no celular | Montserrat Black 138, contorno 9; meça num quadro real |
+| 101 | Ponto/vírgula do ASR na legenda | "MOLEQUE." na tela | `vedit captions` remove por padrão (`--keep-punct` mantém) |
+| 102 | Legenda e motion dizendo a mesma frase | texto duplicado brigando | `--mute "a-b,..."` nos intervalos do motion |
+| 103 | Palavra que atravessa o corte some da legenda | buraco na frase | ajustar o tempo no `words.json` para dentro do clipe |
+| 104 | `burn` caindo no Pillow por ffmpeg sem libass | texto fino, quebra errada | apontar `VEDIT_FFMPEG` para um ffmpeg com libass; `--fontsdir` para fontes baixadas |
+| 105 | Foto de stock com texto legível (ex.: "Happy Birthday") | ruído e idioma errado | conferir cada foto; trocar por uma sem texto |
+| 106 | Partícula/anel/cursor de motion solto sobre rosto ou texto | parece bug | revisar prancha de ~20 quadros do composite e mandar remover |
+| 107 | Cenas de motion soltas, uma por trecho | sistema visual incoerente, muito composite | uma composição transparente do comprimento do vídeo (ProRes 4444) + `vedit composite` |
+| 108 | Download do modelo large-v3 travado sem progresso | transcrição parada | usar `--model small` e corrigir à mão as palavras de borda |
 
 ## G. Crop e tracking
 

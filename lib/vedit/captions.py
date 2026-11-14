@@ -287,6 +287,62 @@ def _clean(t: str) -> str:
     return t.replace("{", "(").replace("}", ")").replace("\\", "")
 
 
+_DROP_PUNCT = re.compile(r"(?<!\d)[.,]|[.,](?!\d)")
+BRIDGE_GAP = 0.35
+MIN_FRAGMENT = 0.04
+
+
+def strip_display_punct(word: str) -> str:
+    """Remove '.' and ',' from a displayed word, keeping decimals ('2,5') and '?', '!', '%'."""
+    return _DROP_PUNCT.sub("", word)
+
+
+def parse_mute(spec) -> list[tuple[float, float]]:
+    """'a-b,c-d' (or a list of pairs) -> sorted intervals in output-timeline seconds."""
+    if not spec:
+        return []
+    if isinstance(spec, str):
+        from .util import parse_ranges
+
+        spec = parse_ranges(spec)
+    out = []
+    for a, b in spec:
+        if b <= a:
+            raise VeditError(f"Janela de --mute inválida: {a}-{b} (o fim deve ser maior que o início).")
+        out.append((float(a), float(b)))
+    return sorted(out)
+
+
+def bridge_events(events: list[dict], gap: float = BRIDGE_GAP) -> list[dict]:
+    """Extend an event up to the next start when the gap between them is > 0 and < ``gap``."""
+    ev = sorted(events, key=lambda e: e["t0"])
+    for a, b in zip(ev, ev[1:], strict=False):
+        d = b["t0"] - a["t1"]
+        if 0.001 < d < gap:
+            a["t1"] = b["t0"]
+    return ev
+
+
+def mute_events(events: list[dict], mute) -> list[dict]:
+    """Clip events against the mute intervals; fragments shorter than MIN_FRAGMENT are dropped."""
+    out = []
+    for e in events:
+        frags = [(e["t0"], e["t1"])]
+        for ms, me in mute:
+            nxt = []
+            for a, b in frags:
+                if me <= a or ms >= b:
+                    nxt.append((a, b))
+                    continue
+                if ms > a:
+                    nxt.append((a, ms))
+                if me < b:
+                    nxt.append((me, b))
+            frags = nxt
+        out += [{**e, "t0": a, "t1": b} for a, b in frags if b - a >= MIN_FRAGMENT]
+    return out
+
+
 def _text_measurer(font: str, size: int, bold: bool):
     """Return text -> width in px (Pillow when available, else a conservative estimate)."""
     try:
@@ -352,11 +408,18 @@ def write_ass(
     case: str | None = None,
     emphasis=None,
     headline: dict | None = None,
+    keep_punct: bool = False,
+    mute=None,
+    size: float | None = None,
+    outline: float | None = None,
+    shadow: float | None = None,
+    bridge: bool = True,
 ) -> None:
     st = STYLES[style]
     case = case or ("upper" if st["upper"] else "keep")
-    size = int(round(height * st["size"]))
-    outline = max(1, int(round(height * st["outline"])))
+    size = int(round(height * st["size"])) if size is None else size
+    outline = max(1, int(round(height * st["outline"]))) if outline is None else outline
+    shadow = st["shadow"] if shadow is None else shadow
     margin_x = int(width * SAFE_MARGIN)
     lines = [
         "[Script Info]",
@@ -371,7 +434,7 @@ def write_ass(
         "BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, "
         "BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
         f"Style: Default,{font},{size},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,"
-        f"{-st['bold']},0,0,0,100,100,0,0,1,{outline},{st['shadow']},5,{margin_x},{margin_x},0,1",
+        f"{-st['bold']},0,0,0,100,100,0,0,1,{outline},{shadow},5,{margin_x},{margin_x},0,1",
     ]
     head_events: list[str] = []
     if headline:
@@ -402,6 +465,7 @@ def write_ass(
     em = parse_highlight(emphasis)
     acc, base = ass_color(accent), "&HFFFFFF&"
     karaoke = mode == "karaoke"
+    cap_events: list[dict] = []
     for b in blocks:
         words = b.get("words") or b["text"].split()
         sstart = b.get("sstart") or [False] * len(words)
@@ -412,16 +476,22 @@ def write_ass(
                 continue
             parts = []
             for i, w in enumerate(words):
-                t = _clean(apply_case(w, case, sstart[i] if i < len(sstart) else False))
+                shown = w if keep_punct else strip_display_punct(w)
+                if not shown:
+                    continue
+                t = _clean(apply_case(shown, case, sstart[i] if i < len(sstart) else False))
                 if em and norm_word(w) in em:
                     t = f"{{\\fscx{EMPHASIS_SCALE}\\fscy{EMPHASIS_SCALE}}}{t}{{\\fscx100\\fscy100}}"
                 if (karaoke and i == k) or (not karaoke and hl and norm_word(w) in hl):
                     t = f"{{\\1c{acc}}}{t}{{\\1c{base}}}"
                 parts.append(t)
-            lines.append(
-                f"Dialogue: 0,{_ass_time(t0)},{_ass_time(t1)},Default,,0,0,0,,"
-                f"{{\\an5\\pos({px},{py})}}{' '.join(parts)}"
-            )
+            if parts:
+                cap_events.append({"t0": t0, "t1": t1, "pos": f"{{\\an5\\pos({px},{py})}}", "text": " ".join(parts)})
+    if bridge:
+        cap_events = bridge_events(cap_events)
+    cap_events = mute_events(cap_events, parse_mute(mute))
+    for e in cap_events:
+        lines.append(f"Dialogue: 0,{_ass_time(e['t0'])},{_ass_time(e['t1'])},Default,,0,0,0,,{e['pos']}{e['text']}")
     lines += head_events
     ensure_parent(path)
     Path(path).write_text("\n".join(lines) + "\n", encoding="utf-8")
@@ -483,6 +553,12 @@ def make_captions(
     headline_end: float | None = None,
     headline_box: str | None = None,
     headline_color: str | None = None,
+    keep_punct: bool = False,
+    mute=None,
+    size: float | None = None,
+    outline: float | None = None,
+    shadow: float | None = None,
+    bridge: bool = True,
 ) -> dict:
     if style not in STYLES:
         raise VeditError(f"Estilo desconhecido: {style} (use viral ou limpo)")
@@ -490,6 +566,7 @@ def make_captions(
         raise VeditError(f"Modo desconhecido: {mode} (use {', '.join(MODES)})")
     if case is not None and case not in CASES:
         raise VeditError(f"Caixa desconhecida: {case} (use {', '.join(CASES)})")
+    mute = parse_mute(mute)
     wj = edlmod.load_json(words_path, "words.json")
     edl = edlmod.load_edl(edl_path)
     fps = edlmod.resolve_fps(edl, edl_path)
@@ -524,7 +601,8 @@ def make_captions(
             "box": headline_box, "color": headline_color,
         }  # fmt: skip
     write_ass(blocks, output, style, w, h, y, font, highlight=hl, accent=accent, mode=mode, case=case,
-              emphasis=em, headline=head)  # fmt: skip
+              emphasis=em, headline=head, keep_punct=keep_punct, mute=mute, size=size, outline=outline,
+              shadow=shadow, bridge=bridge)  # fmt: skip
     srt_path = None
     if srt:
         srt_path = str(Path(output).with_suffix(".srt"))

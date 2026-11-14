@@ -113,6 +113,9 @@ trabalho em `referencias/motion.md` (seção "Handoff") e na skill `/hyperframes
 11. **Meça no artefato final**, não no intermediário: `vedit verify` é obrigatório antes de
     entregar. Reprovou, corrija e rode de novo.
 12. Narração sintética de teste (voz robótica) não vai para prévia: peça a narração real.
+13. **Linha de corte de qualidade**: corte de talking head, podcast ou entrevista com motion só
+    é entregue se passar no checklist de `referencias/padrao-excelencia.md` (receita aprovada
+    pelo dono do pack). Abaixo disso, refaça antes de mostrar.
 
 ## Economia de tokens
 
@@ -160,10 +163,11 @@ resultado de outro agente a quem deve julgar de forma independente.
 | `referencias/plataformas.md` | for limites de duração, áreas seguras e specs por plataforma |
 | `referencias/narracao-tts.md` | quando a narração for gerada por TTS ou precisar de tratamento |
 | `referencias/formatos-virais.md` | o pedido for "nesse estilo" ou for escolher o formato (janela de b-roll, corte de podcast, manchete fixa, cartões de prova); evidência observada de 12 referências |
+| `referencias/padrao-excelencia.md` | **sempre** antes de entregar talking head/podcast com motion: receita aprovada, pipeline exato, brief do motion e checklist de reprovação |
 | `referencias/formatos.md` | for escrever `words.json`, EDL (todos os campos, multi-fonte), JSON de `--guides`, pasta da run ou conferir a sintaxe de um subcomando |
 
 ## Entrega
 
 Ao terminar, responda curto: arquivos finais com caminho, duração, resultado do
-`vedit verify`, lista de textos inventados, o que você **não** pôde confirmar (áudio) e o
+`vedit verify`, checklist de `padrao-excelencia.md` (quando se aplica), lista de textos inventados, créditos das fotos, o que você **não** pôde confirmar (áudio) e o
 que o usuário deve ouvir. Sem promessa de desempenho.

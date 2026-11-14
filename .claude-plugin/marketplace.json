@@ -9,7 +9,7 @@
       "name": "video-editor",
       "source": "./",
       "description": "Editor de vídeo: cortes de podcast, Reels, motion de narração, montagem na batida e anúncios. Requer o plugin HyperFrames para motion.",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "homepage": "https://github.com/liberty-gardenal/video-editor-skill",
       "license": "MIT",
       "keywords": ["video", "editing", "reels", "ffmpeg", "hyperframes"]

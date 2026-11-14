@@ -126,7 +126,7 @@ Uma EDL gera **um** vídeo (`vedit cut` concatena todos os clipes dela): para N 
 | `transcribe`, `digest` | texto com tempo por palavra e versão compacta para ler |
 | `cut`, `edges`, `reframe`, `metrics` | EDL (inclui `lower` e `overlays`), render, bordas, enquadramento, ritmo |
 | `analyze` | teardown de referência: cortes, tamanho de plano, loudness, ritmo de fala, quadros do gancho |
-| `captions`, `burn` | legenda ASS/SRT (modos, caixa, ênfase, manchete fixa) e queima |
+| `captions`, `burn`, `composite` | legenda ASS/SRT (modos, caixa, ênfase, manchete fixa, mute), queima e composição de motion transparente com legenda por cima |
 | `loudness`, `extract-audio`, `mix`, `mux`, `master` | áudio (tirar do render, mixar música, recolocar, normalizar) |
 | `verify` | QC final por plataforma |
 

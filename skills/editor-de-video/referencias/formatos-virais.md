@@ -51,6 +51,10 @@ Cada receita: quando usar, layout, legenda, cadência de inserts, gancho, como m
 
 ### 3.1 Apresentador com janela de b-roll (5 de 12)
 
+> Em teste real com fonte de podcast, esta receita feita só no `vedit` (janela desfocada
+> esperando b-roll, manchete em caixinha) foi reprovada. Para podcast/entrevista, o padrão
+> aprovado é tela cheia + punch-in + trilha de motion: `padrao-excelencia.md`.
+
 - **Quando**: alguém explica, opina ou narra coisas **nomeáveis** (pessoas, lugares, produtos, telas, números). Sem coisa a mostrar, não use: janela com imagem genérica é o "filler" da seção 4.
 - **Layout**: janela de b-roll em cima (~45% da altura), apresentador no ~55% de baixo, costura em degradê suave (~0,45 da altura). Alterna com apresentador em tela cheia nos cortes; cobertura da janela de 40 a 100% do tempo.
 - **Cadência**: o conteúdo da janela troca a cada 1,5-3 s (4 a 6 trocas por 10 s nos trechos densos). Cada imagem **aparece quando a coisa é nomeada** (gatilho por palavra-chave, mesma âncora ±3 quadros de `motion.md`, seção 2).

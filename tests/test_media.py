@@ -458,3 +458,52 @@ def test_verify_handles_missing_true_peak(media, make_edl, tmp_path, monkeypatch
     rep = verify.verify(clip)
     tp = next(c for c in rep["checks"] if c["id"] == "true_peak")
     assert tp["status"] == "aviso"
+
+
+def test_ffmpeg_extra_candidates_prefer_libass(monkeypatch, tmp_path):
+    from vedit import util as u
+
+    fake = tmp_path / "ffmpeg"
+    fake.write_text("")
+    fake.chmod(0o755)
+    other = tmp_path / "other"
+    other.write_text("")
+    other.chmod(0o755)
+    monkeypatch.delenv("VEDIT_FFMPEG", raising=False)
+    monkeypatch.setattr(u, "_path_candidates", lambda n: [str(fake), str(other)])
+    monkeypatch.setattr(u, "filters_of", lambda p: frozenset({"ass"}) if p == str(other) else frozenset())
+    u.ffmpeg_path.cache_clear()
+    try:
+        assert u.ffmpeg_path() == str(other)
+        monkeypatch.setenv("VEDIT_FFMPEG", str(fake))
+        u.ffmpeg_path.cache_clear()
+        assert u.ffmpeg_path() == str(fake)
+    finally:
+        u.ffmpeg_path.cache_clear()
+
+
+def _alpha_overlay(path, size="720x1280", dur=8):
+    subprocess.run(
+        [util.ffmpeg_path(), "-v", "error", "-y", "-f", "lavfi", "-i",
+         f"color=c=red@0.5:s={size}:r=30:d={dur},format=yuva444p10le",
+         "-c:v", "prores_ks", "-profile:v", "4444", str(path)],
+        check=True,
+    )  # fmt: skip
+
+
+def test_composite_validations_and_render(media, tmp_path):
+    from vedit import composite as comp
+
+    ov = tmp_path / "ov.mov"
+    _alpha_overlay(ov)
+    out = tmp_path / "o.mp4"
+    res = comp.composite(media["vertical"], ov, out)
+    assert abs(res["duration"] - 8.0) < 0.1
+    # overlay without alpha is refused
+    with pytest.raises(util.VeditError, match="alpha"):
+        comp.composite(media["vertical"], media["vertical"], tmp_path / "x.mp4")
+    # resolution mismatch is refused
+    ov2 = tmp_path / "ov2.mov"
+    _alpha_overlay(ov2, size="360x640")
+    with pytest.raises(util.VeditError, match="Resolução"):
+        comp.composite(media["vertical"], ov2, tmp_path / "y.mp4")

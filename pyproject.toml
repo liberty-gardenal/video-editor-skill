@@ -1,6 +1,6 @@
 [project]
 name = "vedit"
-version = "0.2.0"
+version = "0.3.0"
 description = "CLI tools behind the editor-de-video Claude Code skill"
 requires-python = ">=3.10"
 license = { text = "MIT" }

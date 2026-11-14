@@ -132,6 +132,8 @@ def cmd_captions(args):
         emphasis=args.emphasis, keep_under_cards=args.keep_under_cards, headline=args.headline,
         headline_y=args.headline_y, headline_start=args.headline_start, headline_end=args.headline_end,
         headline_box=args.headline_box, headline_color=args.headline_color,
+        keep_punct=args.keep_punct, mute=args.mute, size=args.size, outline=args.outline,
+        shadow=args.shadow, bridge=not args.no_bridge,
     )  # fmt: skip
     _out(args, res, f"{res['blocks']} blocos gravados em {res['ass']}.")
 
@@ -139,8 +141,18 @@ def cmd_captions(args):
 def cmd_burn(args):
     from .burn import burn
 
-    res = burn(args.video, args.ass, args.output, font=args.font, force_fallback=args.fallback)
+    res = burn(args.video, args.ass, args.output, font=args.font, force_fallback=args.fallback, fontsdir=args.fontsdir)
     _out(args, res, f"Legenda queimada ({res['method']}): {res['output']}")
+
+
+def cmd_composite(args):
+    from .composite import composite
+
+    res = composite(
+        args.video, args.overlay, args.output, subs=args.subs, fontsdir=args.fontsdir,
+        sfx=args.sfx, sfx_gain=args.sfx_gain,
+    )  # fmt: skip
+    _out(args, res, f"Composição gravada em {res['output']} ({res['duration']:.2f}s).")
 
 
 def cmd_loudness(args):
@@ -319,6 +331,14 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--headline-end", type=arg_time, help="fim da manchete (padrão: vídeo inteiro)")
     p.add_argument("--headline-box", type=arg_color, help="caixa opaca #RRGGBB atrás de cada linha")
     p.add_argument("--headline-color", type=arg_color, help="cor do texto da manchete (padrão #FFFFFF)")
+    p.add_argument("--keep-punct", action="store_true", help='mantém "." e "," nas palavras (padrão: remove)')
+    p.add_argument("--mute", type=arg_ranges, metavar="a-b,c-d",
+                   help="janelas (s, na linha do tempo final) sem legenda, ex.: onde um motion mostra a frase")  # fmt: skip
+    p.add_argument("--size", type=float, help="tamanho da fonte em px do ASS (padrão: automático pelo estilo)")
+    p.add_argument("--outline", type=float, help="espessura do contorno (padrão: automático pelo estilo)")
+    p.add_argument("--shadow", type=float, help="sombra (padrão: a do estilo)")
+    p.add_argument("--no-bridge", action="store_true",
+                   help="não estende legendas separadas por menos de 0.35 s (evita piscar)")  # fmt: skip
     js(p)
     p = add("burn", cmd_burn, "queima a legenda no vídeo (libass ou fallback Pillow)")
     p.add_argument("video")
@@ -326,6 +346,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("-o", "--output", required=True)
     p.add_argument("--font", help="fonte do fallback Pillow (padrão: a do .ass)")
     p.add_argument("--fallback", action="store_true", help="força o fallback Pillow")
+    p.add_argument("--fontsdir", help="pasta de fontes extras para o libass")
+    js(p)
+    p = add("composite", cmd_composite, "motion transparente sobre o vídeo, legenda por cima e SFX opcional")
+    p.add_argument("--video", required=True, help="vídeo base")
+    p.add_argument("--overlay", required=True, help="trilha de motion com alpha (ProRes 4444 / VP9), duração do base")
+    p.add_argument("--subs", help="legenda .ass queimada por cima do overlay")
+    p.add_argument("--fontsdir", help="pasta de fontes extras para o libass")
+    p.add_argument("--sfx", help="áudio de efeitos misturado ao áudio do base")
+    p.add_argument("--sfx-gain", type=float, default=0.0, help="ganho do SFX em dB (padrão 0)")
+    p.add_argument("-o", "--output", required=True, help="saída .mov (áudio PCM) ou .mp4 (AAC)")
     js(p)
     p = add("loudness", cmd_loudness, "LUFS integrado, true peak e LRA")
     p.add_argument("media")

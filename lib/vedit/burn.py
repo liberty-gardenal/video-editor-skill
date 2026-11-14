@@ -231,7 +231,14 @@ def _escape_filter_path(p: str) -> str:
     return p.replace("\\", "/").replace(":", "\\:").replace("'", "\\'")
 
 
-def burn(video, ass, output, font: str | None = None, force_fallback: bool = False) -> dict:
+def _quote_filter_value(v: str) -> str:
+    """Single-quote a filtergraph option value (paths with ':' or ',' stay literal)."""
+    return "'" + v.replace("\\", "/").replace("'", "'\\''") + "'"
+
+
+def burn(
+    video, ass, output, font: str | None = None, force_fallback: bool = False, fontsdir: str | None = None
+) -> dict:
     meta = probe(video, audio_analysis=False)
     if not meta.get("has_video"):
         raise VeditError("O arquivo não tem vídeo.")
@@ -241,12 +248,16 @@ def burn(video, ass, output, font: str | None = None, force_fallback: bool = Fal
     ensure_parent(output)
     log = log_path_for(output, "burn")
     Path(log).write_text("", encoding="utf-8")
+    if fontsdir and not os.path.isdir(fontsdir):
+        raise VeditError(f"--fontsdir não é uma pasta: {fontsdir}")
     use_lib = (has_filter("ass") or has_filter("subtitles")) and not force_fallback
     if use_lib:
         with tempfile.TemporaryDirectory() as td:
             shutil.copy(ass, Path(td) / "cap.ass")
             name = "ass" if has_filter("ass") else "subtitles"
             vf = f"{name}=cap.ass"
+            if fontsdir:
+                vf += f":fontsdir={_quote_filter_value(os.path.abspath(fontsdir))}"
             run_ffmpeg(
                 ["-y", "-i", os.path.abspath(video), "-vf", vf, "-map", "0:v:0", "-map", "0:a?",
                  *tcap, *ENCODE, os.path.abspath(output)],

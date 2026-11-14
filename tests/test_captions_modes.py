@@ -274,3 +274,63 @@ def test_pillow_burn_karaoke_and_headline(media, make_edl, tmp_path):
     ).stdout  # fmt: skip
     px = {tuple(raw[i : i + 3]) for i in range(0, len(raw), 3 * 7)}
     assert any(abs(r - 214) < 14 and abs(g - 40) < 14 and abs(b - 40) < 14 for r, g, b in px)
+
+
+# ------------------------------------------------------------ 0.3.0: pontuação, mute, bridge
+def _texts(text):
+    return [re.sub(r"\{[^}]*\}", "", r[2]) for r in _dialogues(text)]
+
+
+def test_strip_display_punct_keeps_decimals_and_marks():
+    f = captions.strip_display_punct
+    assert f("fim.") == "fim" and f("a,") == "a" and f("...") == ""
+    assert f("2,5") == "2,5" and f("3.14") == "3.14" and f("100%") == "100%"
+    assert f("sério?") == "sério?" and f("sim!") == "sim!"
+
+
+def test_captions_strip_punct_default_and_keep(tmp_path):
+    _, ass = _gen(tmp_path, case="keep")
+    assert "teste" in ass and "teste." not in ass
+    _, ass2 = _gen(tmp_path, case="keep", keep_punct=True)
+    assert "teste." in ass2
+
+
+def test_trailing_dot_still_breaks_block(tmp_path):
+    _, ass = _gen(tmp_path, case="keep", max_words=6)
+    assert not any("teste outra" in t for t in _texts(ass))
+
+
+def test_tags_and_fields_untouched_by_strip(tmp_path):
+    _, ass = _gen(tmp_path, case="keep", highlight="teste", emphasis="mundo")
+    for ln in ass.splitlines():
+        if ln.startswith("Dialogue:"):
+            assert len(ln[9:].split(",", 9)) == 10
+    assert r"\1c&H00D4FF&" in ass and r"\fscx130" in ass
+
+
+def test_mute_clips_and_drops_events():
+    ev = [{"t0": 1.0, "t1": 3.0, "pos": "", "text": "a"}, {"t0": 3.0, "t1": 3.03, "pos": "", "text": "b"}]
+    out = captions.mute_events(ev, captions.parse_mute("1.5-2.0,2.9-4"))
+    spans = [(round(e["t0"], 2), round(e["t1"], 2), e["text"]) for e in out]
+    assert spans == [(1.0, 1.5, "a"), (2.0, 2.9, "a")]
+
+
+def test_mute_option_in_ass(tmp_path):
+    _, plain = _gen(tmp_path, mode="palavra")
+    _, muted = _gen(tmp_path, mode="palavra", mute="1.0-2.0")
+    assert len(_dialogues(muted)) < len(_dialogues(plain))
+    for a, b, _ in _dialogues(muted):
+        assert b <= 1.0 + 0.01 or a >= 2.0 - 0.01
+
+
+def test_bridge_gap_and_flag():
+    ev = [{"t0": 0.0, "t1": 1.0, "text": "a"}, {"t0": 1.2, "t1": 2.0, "text": "b"}, {"t0": 2.6, "t1": 3, "text": "c"}]
+    out = captions.bridge_events([dict(e) for e in ev])
+    assert out[0]["t1"] == 1.2 and out[1]["t1"] == 2.0
+
+
+def test_style_overrides(tmp_path):
+    _, ass = _gen(tmp_path, size=77, outline=5, shadow=2)
+    style = next(ln for ln in ass.splitlines() if ln.startswith("Style: Default"))
+    f = style.split(",")
+    assert f[2] == "77" and f[16] == "5" and f[17] == "2"

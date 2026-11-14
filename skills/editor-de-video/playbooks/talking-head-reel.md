@@ -66,6 +66,10 @@ direitos, sintetizada ou licença que o usuário confirme; `musica.wav` vem dele
 roda depois do corte limpo, na Fase 8: `extract-audio` -> `mix` -> `mux`.
 
 ## Fase 5 — legenda
+> Pedido de Reel "viral", "com motion" ou "de alta qualidade": use a receita de
+> `referencias/padrao-excelencia.md` (karaoke, Montserrat Black 138, `--mute` sob o motion,
+> sem pontuação). O comando abaixo é o mínimo para um corte simples.
+
 ```bash
 vedit captions run-reel/01-words.json --edl run-reel/04-edl.json -o run-reel/out/leg.ass --srt --style viral --max-words 3 --y 0.62 --highlight "palavra1,palavra2"
 vedit sheet run-reel/out/previa.mp4 -o run-reel/qc/leg.jpg --guides zona.json --every 2
@@ -77,14 +81,19 @@ rosto baixo: suba, nunca sobre os olhos). Grupos de 1 a 3 palavras por pontuaç�
 máximo) e **nunca** número ou afirmação que a fonte não sustenta; sem a lista, não há
 destaque. Sem libass no ffmpeg, o `vedit burn` usa o fallback com Pillow, mais lento.
 
-## Fase 6 — gráficos e b-roll opcionais (HyperFrames)
-Só se o usuário quiser: cartão de número, lower-third, ícone, pergunta na tela. Uma
+## Fase 6 — gráficos e b-roll (HyperFrames)
+Se o pedido fala em motion, viral, retenção ou alta qualidade, isto **não é opcional**: siga
+`referencias/padrao-excelencia.md` (uma trilha de motion transparente do vídeo inteiro, fotos
+reais em tela cheia, frase de impacto, `vedit composite`). Fora disso, só se o usuário quiser: cartão de número, lower-third, ícone, pergunta na tela. Uma
 composição por trecho com a duração exata; entrada na palavra certa lida do `words.json`.
 Skill: `/hyperframes:talking-head-recut` (overlays sobre o vídeo da pessoa) ou
 `/hyperframes:motion-graphics`. Prévia em fps baixo, prancha, só então render alto. Veja
 `motion.md`, seção 15 (handoff). Textos inventados vão numa lista para revisão.
 
 ## Fase 6b — janela de b-roll, cartões e manchete (opcional, no `vedit`)
+> Atenção: o layout `lower` com a metade de cima desfocada e sem motion foi **reprovado** em
+> teste real ("cortes bugados"). Só use com b-roll real cobrindo a janela o tempo todo.
+
 Para o formato "apresentador com janela de b-roll" (receita e exemplo em
 `referencias/formatos-virais.md`; é prática observada em vídeos publicados, não causa
 comprovada de retenção). Só se houver **coisas nomeadas para mostrar**; sem isso, pule.

@@ -239,7 +239,7 @@ def test_highlight_matching_and_ass_colour_is_bgr(tmp_path):
     ass = tmp_path / "h.ass"
     captions.write_ass(blocks, ass, "limpo", 1080, 1920, 0.62, "Arial", highlight="ACAO", accent="#10203A")
     line = [ln for ln in ass.read_text().splitlines() if ln.startswith("Dialogue")][0]
-    assert line.endswith("a {\\1c&H3A2010&}ação,{\\1c&HFFFFFF&} boa")
+    assert line.endswith("a {\\1c&H3A2010&}ação{\\1c&HFFFFFF&} boa")
     plain = tmp_path / "p.ass"
     captions.write_ass(blocks, plain, "limpo", 1080, 1920, 0.62, "Arial")
     assert "\\1c" not in plain.read_text()

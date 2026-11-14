@@ -58,6 +58,10 @@ Medido em referência (30 fps): a entrada do bloco tem ~93% da massa no 1º quad
 
 ## 7. Posição, tamanho e zonas seguras (1080x1920)
 
+> Padrão aprovado em teste real (talking head com motion): Montserrat Black, caixa alta,
+> `--size 138 --outline 9 --shadow 3`, `--y 0.70`, `--mode karaoke --max-words 3`, sem
+> pontuação e `--mute` sob o motion. Detalhes em `padrao-excelencia.md`.
+
 | Item | Default | Observação |
 |---|---|---|
 | Faixa de legenda | A posição **segue o layout**: tela cheia `--y 0.62` (ou 0,62-0,78 conforme o rosto); layout empilhado (`lower`, janela de b-roll em cima) na **costura**, y ≈ 0,43-0,50, que é o padrão dos clipes `lower` (ajuste por clipe com `caption_y`). `--y 0.62` (padrão do `vedit captions`; centro do texto em y ~1190 de 1920, dentro da faixa 1040-1220 e acima da zona de interface). Para talking head com o rosto alto no quadro, `--y` 0.70 a 0.78 (faixa ~1270-1540, abaixo do queixo) | **sempre** confirme numa prancha com `vedit sheet --guides` (retângulo do rosto no pior quadro + retângulo da faixa): se cruzam, mova `--y` ou reenquadre |

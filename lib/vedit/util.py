@@ -63,6 +63,11 @@ def filters_of(ffmpeg: str) -> frozenset[str]:
     return frozenset(names)
 
 
+def _has_libass(ffmpeg: str) -> bool:
+    f = filters_of(ffmpeg)
+    return "ass" in f or "subtitles" in f
+
+
 @cache
 def ffmpeg_path() -> str:
     env = os.environ.get("VEDIT_FFMPEG")
@@ -74,9 +79,16 @@ def ffmpeg_path() -> str:
     cands = _path_candidates("ffmpeg")
     if not cands:
         raise VeditError("ffmpeg não encontrado no PATH. Rode `vedit doctor` para ver como instalar.")
-    if len(cands) > 1:
-        for c in cands:
-            if "ass" in filters_of(c):
+    if not _has_libass(cands[0]):
+        known = {os.path.realpath(c) for c in cands}
+        extra = [
+            str(p) for p in (Path.home() / ".local/bin/ffmpeg", Path("/opt/homebrew/bin/ffmpeg"),
+                             Path("/usr/local/bin/ffmpeg"))
+            if p.is_file() and os.access(p, os.X_OK) and os.path.realpath(p) not in known
+        ]  # fmt: skip
+        for c in [*cands[1:], *extra]:
+            if _has_libass(c):
+                info(f"ffmpeg sem libass em {cands[0]}: usando {c} (tem libass).")
                 return c
     return cands[0]
 
